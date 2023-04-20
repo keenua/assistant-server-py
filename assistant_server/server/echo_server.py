@@ -15,5 +15,7 @@ async def echo(websocket: WebSocketServerProtocol, path: str) -> None:
 
 
 async def start():
-    async with serve(echo, "localhost", 3000):
+    PORT = 3000
+    print(f"Running server on port {PORT}")
+    async with serve(echo, "localhost", PORT):
         await asyncio.Future()
