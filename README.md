@@ -7,6 +7,7 @@ Create conda environment and activate it:
 ```bash
 conda env create -f environment.yml
 conda activate assistant
+conda install -c conda-forge sox
 ```
 
 ## Running the server

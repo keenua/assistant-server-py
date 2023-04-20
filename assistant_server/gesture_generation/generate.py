@@ -17,7 +17,7 @@ from data_pipeline import preprocess_animation
 from data_pipeline import preprocess_audio
 from helpers import split_by_ratio
 from utils import write_bvh
-
+from postprocessing import reset_pose
 
 def generate_gesture(
         audio_file,
@@ -523,3 +523,12 @@ if __name__ == "__main__":
                 seed=args.seed,
                 use_gpu=args.use_gpu
             )
+            
+            # Get file name args.audio using Path
+            input_name = Path(args.audio).stem
+            style_label = Path(args.style).stem
+            output_file_name = f"audio_{input_name}_label_{style_label}"
+
+            result_file_path = results_path / (f"{output_file_name}.bvh")
+            fixed_result_file_path = results_path / (f"{output_file_name}_fixed.bvh")
+            reset_pose(result_file_path, fixed_result_file_path)
