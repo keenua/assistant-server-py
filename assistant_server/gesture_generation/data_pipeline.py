@@ -10,9 +10,9 @@ from omegaconf import DictConfig
 from scipy import interpolate
 from scipy.interpolate import griddata
 
-from anim import bvh, quat
-from audio.audio_files import read_wavfile, write_wavefile
-from audio.spectrograms import extract_mel_spectrogram_for_tts
+from assistant_server.gesture_generation.anim import bvh, quat
+from assistant_server.gesture_generation.audio.audio_files import read_wavfile, write_wavefile
+from assistant_server.gesture_generation.audio.spectrograms import extract_mel_spectrogram_for_tts
 
 FILE_ROOT = os.path.dirname(os.path.realpath(__file__))
 os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"

@@ -1,20 +1,29 @@
 import json
-import time
+import os
+import tempfile
+import sys
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, List, Optional, Tuple
+from uuid import uuid4
 
 import numpy as np
 import torch
-from anim import bvh, quat
-from anim.txform import xform_orthogonalize_from_xy
-from audio.audio_files import read_wavfile
-from data_pipeline import preprocess_animation, preprocess_audio
-from helpers import split_by_ratio
 from omegaconf import DictConfig
-from postprocessing import reset_pose
 from torch import Tensor
-from utils import write_bvh
+
+from assistant_server.gesture_generation.anim import bvh, quat
+from assistant_server.gesture_generation.anim.txform import \
+    xform_orthogonalize_from_xy
+from assistant_server.gesture_generation.audio.audio_files import read_wavfile
+from assistant_server.gesture_generation.data_pipeline import (
+    preprocess_animation, preprocess_audio)
+from assistant_server.gesture_generation.helpers import split_by_ratio
+from assistant_server.gesture_generation.postprocessing import reset_pose
+from assistant_server.gesture_generation.utils import timeit, write_bvh
+
+
+sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 
 @dataclass
@@ -117,15 +126,24 @@ class GestureInferenceModel:
 
                     # convert to tensor
                     nframes = len(anim_data["rotations"])
-                    root_vel = torch.as_tensor(root_vel, dtype=torch.float32, device=device)
-                    root_vrt = torch.as_tensor(root_vrt, dtype=torch.float32, device=device)
-                    root_pos = torch.as_tensor(root_pos, dtype=torch.float32, device=device)
-                    root_rot = torch.as_tensor(root_rot, dtype=torch.float32, device=device)
-                    lpos = torch.as_tensor(lpos, dtype=torch.float32, device=device)
-                    ltxy = torch.as_tensor(ltxy, dtype=torch.float32, device=device)
-                    lvel = torch.as_tensor(lvel, dtype=torch.float32, device=device)
-                    lvrt = torch.as_tensor(lvrt, dtype=torch.float32, device=device)
-                    gaze_pos = torch.as_tensor(gaze_pos, dtype=torch.float32, device=device)
+                    root_vel = torch.as_tensor(
+                        root_vel, dtype=torch.float32, device=device)
+                    root_vrt = torch.as_tensor(
+                        root_vrt, dtype=torch.float32, device=device)
+                    root_pos = torch.as_tensor(
+                        root_pos, dtype=torch.float32, device=device)
+                    root_rot = torch.as_tensor(
+                        root_rot, dtype=torch.float32, device=device)
+                    lpos = torch.as_tensor(
+                        lpos, dtype=torch.float32, device=device)
+                    ltxy = torch.as_tensor(
+                        ltxy, dtype=torch.float32, device=device)
+                    lvel = torch.as_tensor(
+                        lvel, dtype=torch.float32, device=device)
+                    lvrt = torch.as_tensor(
+                        lvrt, dtype=torch.float32, device=device)
+                    gaze_pos = torch.as_tensor(
+                        gaze_pos, dtype=torch.float32, device=device)
 
                     base_pos = BasePos(
                         root_pos=root_pos,
@@ -157,7 +175,8 @@ class GestureInferenceModel:
                         ],
                         dim=1,
                     )
-                    example_feature_vec = (example_feature_vec - config.anim_input_mean) / config.anim_input_std
+                    example_feature_vec = (
+                        example_feature_vec - config.anim_input_mean) / config.anim_input_std
 
                     assert config.network_style_encoder_script is not None
 
@@ -183,7 +202,7 @@ class GestureInferenceModel:
 
         np.random.seed(seed)
         torch.manual_seed(seed)
-        torch.set_num_threads(1)
+        torch.set_num_threads(10)
         device = "cuda" if use_gpu and torch.cuda.is_available() else "cpu"
 
         # Data pipeline conf (We must use the same processing configuration as the one in training)
@@ -197,7 +216,8 @@ class GestureInferenceModel:
 
         label_names = details["label_names"]
         bone_names = details["bone_names"]
-        parents = torch.as_tensor(details["parents"], dtype=torch.long, device=device)
+        parents = torch.as_tensor(
+            details["parents"], dtype=torch.long, device=device)
         dt = details["dt"]
 
         # Load Stats (Mean and Std of input/output)
@@ -223,14 +243,17 @@ class GestureInferenceModel:
         )
 
         # Load Networks
-        network_speech_encoder = torch.load(path_network_speech_encoder_weights, map_location=device).to(device)
+        network_speech_encoder =  torch.load(
+            path_network_speech_encoder_weights, map_location=device).to(device)
         network_speech_encoder.eval()
 
-        network_decoder = torch.load(path_network_decoder_weights, map_location=device).to(device)
+        network_decoder = torch.load(
+            path_network_decoder_weights, map_location=device).to(device)
         network_decoder.eval()
 
         if self.style_encoding_type == "example":
-            network_style_encoder = torch.load(path_network_style_encoder_weights, map_location=device).to(device)
+            network_style_encoder = torch.load(
+                path_network_style_encoder_weights, map_location=device).to(device)
             network_style_encoder.eval()
 
         network_speech_encoder_script = network_speech_encoder
@@ -264,12 +287,14 @@ class GestureInferenceModel:
             network_style_encoder_script=network_style_encoder_script,
         )
 
+    @timeit
     def load_model(self):
         # Load config
         self.config = self.load_config()
         self.style_encoding, self.base_pos = self.load_style_encoding()
 
-    def infer(self, audio_file_path: str, result_path: str):
+    @timeit
+    def infer(self, audio_file_path: str, dest_path: Optional[str] = None) -> Optional[str]:
         config = self.config
 
         assert config is not None, "Model not loaded"
@@ -299,7 +324,8 @@ class GestureInferenceModel:
                 dtype=torch.float32,
             )
             speech_encoding = config.network_speech_encoder_script(
-                (audio_features[np.newaxis] - config.audio_input_mean) / config.audio_input_std
+                (audio_features[np.newaxis] -
+                 config.audio_input_mean) / config.audio_input_std
             )
             final_style_encoding: Any = None
 
@@ -314,9 +340,11 @@ class GestureInferenceModel:
                     final_style_encoding = []
                     for i, style_encoding in enumerate(self.style_encoding):
                         final_style_encoding.append(
-                            style_encoding.unsqueeze(1).repeat((1, se[i][-1] - se[i][0], 1))
+                            style_encoding.unsqueeze(1).repeat(
+                                (1, se[i][-1] - se[i][0], 1))
                         )
-                    final_style_encoding = torch.cat(final_style_encoding, dim=1)
+                    final_style_encoding = torch.cat(
+                        final_style_encoding, dim=1)
                 else:
                     final_style_encoding = self.style_encoding[0]
             elif self.blend_type == "add":
@@ -324,7 +352,8 @@ class GestureInferenceModel:
                 if len(self.style_encoding) > 1:
                     assert len(self.style_encoding) == len(self.blend_ratio)
                     final_style_encoding = torch.matmul(
-                        torch.stack(self.style_encoding, dim=1).transpose(2, 1),
+                        torch.stack(self.style_encoding,
+                                    dim=1).transpose(2, 1),
                         torch.tensor(self.blend_ratio, device=config.device),
                     )
                 else:
@@ -344,7 +373,8 @@ class GestureInferenceModel:
             lvrt_0 = base_pos.lvrt[0][np.newaxis]
 
             if final_style_encoding.dim() == 2:
-                final_style_encoding = final_style_encoding.unsqueeze(1).repeat((1, speech_encoding.shape[1], 1))
+                final_style_encoding = final_style_encoding.unsqueeze(
+                    1).repeat((1, speech_encoding.shape[1], 1))
             (
                 V_root_pos,
                 V_root_rot,
@@ -376,7 +406,12 @@ class GestureInferenceModel:
                 config.dt,
             )
 
-            V_lrot = quat.from_xform(xform_orthogonalize_from_xy(V_ltxy).detach().cpu().numpy())
+            V_lrot = quat.from_xform(
+                xform_orthogonalize_from_xy(V_ltxy).detach().cpu().numpy())
+
+            result_path = dest_path
+            if result_path is None:
+                result_path = os.path.join(tempfile.gettempdir(), f"{uuid4()}.bvh")
 
             try:
                 write_bvh(
@@ -394,22 +429,22 @@ class GestureInferenceModel:
                 )
 
                 reset_pose(result_path, result_path)
+
+                with open(result_path, "r") as f:
+                    result = f.read()
+
+                if dest_path is None:
+                    os.remove(result_path)
+
+                return result
             except (PermissionError, OSError) as e:
                 print(e)
+                return None
 
 
 if __name__ == "__main__":
     model = GestureInferenceModel()
 
-    # time it
-    start = time.time()
     model.load_model()
-    print("Model loaded in", time.time() - start, "seconds")
-
-    start = time.time()
-    model.infer("data/samples/barefoot.wav", "data/results/1.bvh")
-    print("Inference done in", time.time() - start, "seconds")
-
-    start = time.time()
-    model.infer("data/samples/barefoot.wav", "data/results/2.bvh")
-    print("Inference done in", time.time() - start, "seconds")
+    model.infer("data/samples/barefoot.wav")
+    model.infer("data/samples/barefoot.wav")

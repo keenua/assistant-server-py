@@ -1,7 +1,10 @@
+import time
+from functools import wraps
+
 import numpy as np
 from scipy import interpolate
 
-from anim import bvh, quat
+from assistant_server.gesture_generation.anim import bvh, quat
 
 
 def change_bvh(filename, savename, order=None, fps=None, pace=1.0, center=False):
@@ -10,33 +13,40 @@ def change_bvh(filename, savename, order=None, fps=None, pace=1.0, center=False)
 
     if order is not None:
         output["order"] = order
-        rotations = quat.unroll(quat.from_euler(np.radians(anim_data['rotations']), order=anim_data['order']))
-        output["rotations"] = np.degrees(quat.to_euler(rotations, order=output["order"]))
+        rotations = quat.unroll(quat.from_euler(np.radians(
+            anim_data['rotations']), order=anim_data['order']))
+        output["rotations"] = np.degrees(
+            quat.to_euler(rotations, order=output["order"]))
     if pace is not None or fps is not None:
         if fps is None:
             fps = 1.0 / anim_data["frametime"]
         positions = anim_data['positions']
-        rotations = quat.unroll(quat.from_euler(np.radians(anim_data['rotations']), order=anim_data['order']))
+        rotations = quat.unroll(quat.from_euler(np.radians(
+            anim_data['rotations']), order=anim_data['order']))
         nframes = positions.shape[0]
         nbones = positions.shape[1]
         original_times = np.linspace(0, nframes - 1, nframes)
         sample_times = np.linspace(
-            0, nframes - 1, int(pace * (nframes * (fps * anim_data["frametime"]) - 1))
+            0, nframes -
+            1, int(pace * (nframes * (fps * anim_data["frametime"]) - 1))
         )
         output["positions"] = interpolate.griddata(original_times, output["positions"].reshape([nframes, -1]),
                                                    sample_times, method='cubic').reshape([len(sample_times), nbones, 3])
         rotations = interpolate.griddata(original_times, rotations.reshape([nframes, -1]),
                                          sample_times, method='cubic').reshape([len(sample_times), nbones, 4])
         rotations = quat.normalize(rotations)
-        output["rotations"] = np.degrees(quat.to_euler(rotations, order=output["order"]))
+        output["rotations"] = np.degrees(
+            quat.to_euler(rotations, order=output["order"]))
         output["frametime"] = 1.0 / fps
 
     if center:
-        lrot = quat.from_euler(np.radians(output["rotations"]), output["order"])
+        lrot = quat.from_euler(np.radians(
+            output["rotations"]), output["order"])
         offset_pos = output["positions"][0:1, 0:1].copy() * np.array([1, 0, 1])
         offset_rot = lrot[0:1, 0:1].copy() * np.array([1, 0, 1, 0])
 
-        root_pos = quat.mul_vec(quat.inv(offset_rot), output["positions"][:, 0:1] - offset_pos)
+        quat.mul_vec(quat.inv(offset_rot),
+                     output["positions"][:, 0:1] - offset_pos)
         output["positions"][:, 0:1] = quat.mul_vec(quat.inv(offset_rot),
                                                    output["positions"][:, 0:1] - offset_pos)
         output["rotations"][:, 0:1] = np.degrees(
@@ -61,10 +71,12 @@ def write_bvh(
         offset_pos = V_root_pos[0:1].copy()
         offset_rot = V_root_rot[0:1].copy()
 
-        V_root_pos = quat.mul_vec(quat.inv(offset_rot), V_root_pos - offset_pos)
+        V_root_pos = quat.mul_vec(
+            quat.inv(offset_rot), V_root_pos - offset_pos)
         V_root_rot = quat.mul(quat.inv(offset_rot), V_root_rot)
         V_root_pos = (
-                quat.mul_vec(start_rotation[np.newaxis], V_root_pos) + start_position[np.newaxis]
+            quat.mul_vec(start_rotation[np.newaxis],
+                         V_root_pos) + start_position[np.newaxis]
         )
         V_root_rot = quat.mul(start_rotation[np.newaxis], V_root_rot)
 
@@ -85,3 +97,16 @@ def write_bvh(
             rotations=np.degrees(quat.to_euler(V_lrot, order=order)),
         ),
     )
+
+
+def timeit(func):
+    @wraps(func)
+    def timeit_wrapper(*args, **kwargs):
+        start_time = time.perf_counter()
+        result = func(*args, **kwargs)
+        end_time = time.perf_counter()
+        total_time = end_time - start_time
+        print(
+            f'Function {func.__name__}{args} {kwargs} Took {total_time:.4f} seconds')
+        return result
+    return timeit_wrapper
