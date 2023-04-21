@@ -11,13 +11,15 @@ from rich.console import Console
 
 from anim import bvh
 from anim import quat
-from anim.txform import *
+from anim.txform import xform_orthogonalize_from_xy
 from audio.audio_files import read_wavfile
 from data_pipeline import preprocess_animation
 from data_pipeline import preprocess_audio
 from helpers import split_by_ratio
 from utils import write_bvh
 from postprocessing import reset_pose
+import torch
+
 
 def generate_gesture(
         audio_file,
@@ -97,7 +99,6 @@ def generate_gesture(
     with open(path_data_definition, "r") as f:
         details = json.load(f)
 
-    njoints = len(details["bone_names"])
     nlabels = len(details["label_names"])
     label_names = details["label_names"]
     bone_names = details["bone_names"]
