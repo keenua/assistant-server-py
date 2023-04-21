@@ -21,9 +21,9 @@ async def process(prompt: str, websocket: WebSocketServerProtocol) -> None:
             audio = generate_speech(statement.text)
 
             wav_file = "temp.wav"
-            wav = mp3_to_wav(audio, wav_file)
+            mp3_to_wav(audio, wav_file)
 
-            data["audio"] = bytes_to_base64(wav)
+            data["audio"] = bytes_to_base64(audio)
             data["bvh"] = model.infer(wav_file)
 
             os.remove(wav_file)
@@ -56,14 +56,15 @@ async def start():
         await asyncio.Future()
 
 if __name__ == "__main__":
-    audio = generate_speech("Hello, my name is John.")
+    text = "Hello, my name is Rachel."
+    audio = generate_speech(text)
 
     wav_file = "temp.wav"
-    wav = mp3_to_wav(audio, wav_file)
+    mp3_to_wav(audio, wav_file)
 
     data = {}
-    data["text"] = "Hello, my name is John."
-    data["audio"] = bytes_to_base64(wav)
+    data["text"] = text
+    data["audio"] = bytes_to_base64(audio)
     data["bvh"] = model.infer(wav_file)
 
     os.remove(wav_file)
