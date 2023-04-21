@@ -1,7 +1,7 @@
 import re
 import os
 import asyncio
-from typing import Callable, List, Optional
+from typing import AsyncGenerator, List, Optional
 import openai
 from openai.openai_object import OpenAIObject
 from dotenv import load_dotenv
@@ -84,7 +84,7 @@ class StatementTransformer:
         return statements
 
 
-async def gpt(user_prompt: str, on_statement: Callable[[Statement], None]):
+async def gpt(user_prompt: str) -> AsyncGenerator[Statement, None]:
     current_dir = os.path.dirname(os.path.realpath(__file__))
     with open(f"{current_dir}/configs/system_prompt.txt", "r") as f:
         system_prompt = f.read()
@@ -112,14 +112,16 @@ async def gpt(user_prompt: str, on_statement: Callable[[Statement], None]):
 
         if statements:
             for statement in statements:
-                on_statement(statement)
+                yield statement
 
     print(f"Full buffer: {statement_transformer.full_buffer}")
 
 
-if __name__ == "__main__":
-    def on_statement(statement: Statement):
+async def test():
+    user_prompt = "Write a Python function that takes two numbers and returns their sum."
+    async for statement in gpt(user_prompt):
         print(statement)
 
-    user_prompt = "Write a Python function that takes two numbers and returns their sum."
-    asyncio.run(gpt(user_prompt, on_statement))
+
+if __name__ == "__main__":
+    asyncio.run(test())
