@@ -25,3 +25,15 @@ python .\assistant_server\gesture_generation\generate.py -a .\data\samples\baref
 ```
 
 Results should be in `data/results`
+
+## Sample gpt
+
+```bash
+python .\assistant_server\api_clients\gpt.py
+```
+
+## Sample tts
+
+```bash
+python .\assistant_server\api_clients\speech.py
+```
