@@ -523,8 +523,7 @@ if __name__ == "__main__":
                 seed=args.seed,
                 use_gpu=args.use_gpu
             )
-            
-            # Get file name args.audio using Path
+
             input_name = Path(args.audio).stem
             style_label = Path(args.style).stem
             output_file_name = f"audio_{input_name}_label_{style_label}"
