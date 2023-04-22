@@ -13,10 +13,17 @@
             "justMyCode": true
         },
         {
-            "name": "Python: Module",
+            "name": "Python: Server Module",
             "type": "python",
             "request": "launch",
             "module": "assistant_server.server",
+            "justMyCode": true
+        },
+        {
+            "name": "Python: Gesture Module",
+            "type": "python",
+            "request": "launch",
+            "module": "assistant_server.gesture_generation",
             "justMyCode": true
         }
     ]

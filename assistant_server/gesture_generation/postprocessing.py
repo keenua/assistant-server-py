@@ -76,4 +76,4 @@ def reset_pose(source: str, destination: str):
     # root.applyRestposeScale(recursive=True, bake=False, bakeKeyframes=True)
 
     print('| Write file')
-    bvhio.writeHierarchy(path=destination, root=root, frameTime=1/30)
+    bvhio.writeHierarchy(path=destination, root=root, frameTime=1/60)

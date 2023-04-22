@@ -62,7 +62,7 @@ class BasePos:
 
 
 class GestureInferenceModel:
-    def __init__(self, options_path: str = "./data/zeggs/options.json", style_path: str = "./data/zeggs/styles/old.bvh"):
+    def __init__(self, options_path: str = "./data/zeggs/options.json", style: str = "Happy"):
         with open(options_path, "r") as f:
             options = json.load(f)
 
@@ -78,10 +78,13 @@ class GestureInferenceModel:
 
         self.results_path = Path(self.output_path) / "results"
 
-        self.style_encoding_type = "example"
-        self.style = [(Path(style_path), None)]
+        self.style_encoding_type = "label"
+        self.style = [style]
 
-        self.blend_type = "add"
+        # self.style_encoding_type = "example"
+        # self.style = [(Path(style_path), None)]
+
+        self.blend_type = "stitch"
         self.blend_ratio = [0.5, 0.5]
         self.config: Optional[GestureInferenceModelConfig] = None
         self.style_encoding: List = []
@@ -184,6 +187,14 @@ class GestureInferenceModel:
                         example_feature_vec[np.newaxis], temperature
                     )
                     style_encodings.append(style_encoding)
+                elif self.style_encoding_type == "label":
+                    style_index = config.labels.index(style)
+                    # style_index = style
+                    style_embeddding = torch.zeros((1, 64), dtype=torch.float32, device=device)
+                    style_embeddding[0, style_index] = 1.0
+                    style_encodings.append(style_embeddding)
+
+                    base_pos = self.load_first_pose()
                 else:
                     raise ValueError("Unknown style encoding type")
 
@@ -243,13 +254,16 @@ class GestureInferenceModel:
         )
 
         # Load Networks
-        network_speech_encoder =  torch.load(
+        network_speech_encoder = torch.load(
             path_network_speech_encoder_weights, map_location=device).to(device)
         network_speech_encoder.eval()
 
         network_decoder = torch.load(
             path_network_decoder_weights, map_location=device).to(device)
         network_decoder.eval()
+
+        network_style_encoder = None
+        network_style_encoder_script = None
 
         if self.style_encoding_type == "example":
             network_style_encoder = torch.load(
@@ -292,6 +306,51 @@ class GestureInferenceModel:
         # Load config
         self.config = self.load_config()
         self.style_encoding, self.base_pos = self.load_style_encoding()
+
+    def load_first_pose(self) -> BasePos:
+        device = self.config.device
+
+        anim_data = bvh.load("data/zeggs/styles/first_pose.bvh")
+        (
+            root_pos,
+            root_rot,
+            root_vel,
+            root_vrt,
+            lpos,
+            lrot,
+            ltxy,
+            lvel,
+            lvrt,
+            cpos,
+            crot,
+            ctxy,
+            cvel,
+            cvrt,
+            gaze_pos,
+            gaze_dir,
+        ) = preprocess_animation(anim_data)
+
+        root_vel = torch.as_tensor(root_vel, dtype=torch.float32, device=device)
+        root_vrt = torch.as_tensor(root_vrt, dtype=torch.float32, device=device)
+        root_pos = torch.as_tensor(root_pos, dtype=torch.float32, device=device)
+        root_rot = torch.as_tensor(root_rot, dtype=torch.float32, device=device)
+        lpos = torch.as_tensor(lpos, dtype=torch.float32, device=device)
+        ltxy = torch.as_tensor(ltxy, dtype=torch.float32, device=device)
+        lvel = torch.as_tensor(lvel, dtype=torch.float32, device=device)
+        lvrt = torch.as_tensor(lvrt, dtype=torch.float32, device=device)
+        gaze_pos = torch.as_tensor(gaze_pos, dtype=torch.float32, device=device)
+
+        return BasePos(
+            root_pos=root_pos,
+            root_rot=root_rot,
+            root_vel=root_vel,
+            root_vrt=root_vrt,
+            lpos=lpos,
+            ltxy=ltxy,
+            lvel=lvel,
+            lvrt=lvrt,
+            gaze_pos=gaze_pos,
+        )
 
     @timeit
     def infer(self, audio_file_path: str, dest_path: Optional[str] = None) -> Optional[str]:
@@ -409,9 +468,8 @@ class GestureInferenceModel:
             V_lrot = quat.from_xform(
                 xform_orthogonalize_from_xy(V_ltxy).detach().cpu().numpy())
 
-            result_path = dest_path
-            if result_path is None:
-                result_path = os.path.join(tempfile.gettempdir(), f"{uuid4()}.bvh")
+            result_path = os.path.join(tempfile.gettempdir(), f"{uuid4()}.bvh")
+            fixed_path = dest_path or os.path.join(tempfile.gettempdir(), f"{uuid4()}.bvh")
 
             try:
                 write_bvh(
@@ -428,13 +486,14 @@ class GestureInferenceModel:
                     start_rotation=np.array([1, 0, 0, 0]),
                 )
 
-                reset_pose(result_path, result_path)
+                reset_pose(result_path, fixed_path)
 
-                with open(result_path, "r") as f:
+                with open(fixed_path, "r") as f:
                     result = f.read()
 
+                os.remove(result_path)
                 if dest_path is None:
-                    os.remove(result_path)
+                    os.remove(fixed_path)
 
                 return result
             except (PermissionError, OSError) as e:
