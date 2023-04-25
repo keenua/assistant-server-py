@@ -89,6 +89,7 @@ class GestureInferenceModel:
         self.config: Optional[GestureInferenceModelConfig] = None
         self.style_encoding: List = []
         self.base_pos: Optional[BasePos] = None
+        self.prev_anim: Optional[dict] = None
 
     def load_style_encoding(self, temperature: float = 1.0) -> Tuple[List[Any], BasePos]:
         config = self.config
@@ -193,8 +194,8 @@ class GestureInferenceModel:
                     style_embeddding = torch.zeros((1, 64), dtype=torch.float32, device=device)
                     style_embeddding[0, style_index] = 1.0
                     style_encodings.append(style_embeddding)
-
-                    base_pos = self.load_first_pose()
+                    
+                    base_pos = self.load_first_pose(self.prev_anim)
                 else:
                     raise ValueError("Unknown style encoding type")
 
@@ -305,12 +306,13 @@ class GestureInferenceModel:
     def load_model(self):
         # Load config
         self.config = self.load_config()
-        self.style_encoding, self.base_pos = self.load_style_encoding()
 
-    def load_first_pose(self) -> BasePos:
+    def load_first_pose(self, anim_data: Optional[dict[str, Any]] = None) -> BasePos:
         device = self.config.device
 
-        anim_data = bvh.load("data/zeggs/styles/first_pose.bvh")
+        if anim_data is None:
+            anim_data = bvh.load("data/zeggs/styles/first_pose.bvh")
+
         (
             root_pos,
             root_rot,
@@ -357,6 +359,8 @@ class GestureInferenceModel:
         config = self.config
 
         assert config is not None, "Model not loaded"
+
+        self.style_encoding, self.base_pos = self.load_style_encoding()
 
         with torch.no_grad():
             # Load Audio
@@ -472,7 +476,7 @@ class GestureInferenceModel:
             fixed_path = dest_path or os.path.join(tempfile.gettempdir(), f"{uuid4()}.bvh")
 
             try:
-                write_bvh(
+                bvh_data = write_bvh(
                     result_path,
                     V_root_pos[0].detach().cpu().numpy(),
                     V_root_rot[0].detach().cpu().numpy(),
@@ -485,6 +489,13 @@ class GestureInferenceModel:
                     start_position=np.array([0, 0, 0]),
                     start_rotation=np.array([1, 0, 0, 0]),
                 )
+
+                self.prev_anim = bvh_data
+
+                # take last 4 frames only
+                if self.prev_anim["rotations"].shape[0] > 4:
+                    self.prev_anim["rotations"] = self.prev_anim["rotations"][-4:]
+                    self.prev_anim["positions"] = self.prev_anim["positions"][-4:]
 
                 reset_pose(result_path, fixed_path)
 
@@ -505,5 +516,5 @@ if __name__ == "__main__":
     model = GestureInferenceModel()
 
     model.load_model()
-    model.infer("data/samples/barefoot.wav")
-    model.infer("data/samples/barefoot.wav")
+    model.infer("data/samples/barefoot.wav", "part1.bvh")
+    model.infer("data/samples/barefoot.wav", "part2.bvh")
