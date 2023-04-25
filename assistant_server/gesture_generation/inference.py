@@ -305,7 +305,7 @@ class GestureInferenceModel:
     @timeit
     def load_model(self):
         # Load config
-        self.config = self.load_config()
+        self.config = self.load_config(use_gpu=True)
 
     def load_first_pose(self, anim_data: Optional[dict[str, Any]] = None) -> BasePos:
         device = self.config.device

@@ -52,7 +52,7 @@ async def handle_connection(websocket: WebSocketServerProtocol, path: str) -> No
 async def start():
     port = 3000
     print(f"WebSocket server is running on port {port}")
-    async with serve(handle_connection, "localhost", port):
+    async with serve(handle_connection, port=port):
         await asyncio.Future()
 
 if __name__ == "__main__":
