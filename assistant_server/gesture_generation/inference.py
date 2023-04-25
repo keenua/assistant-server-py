@@ -355,7 +355,7 @@ class GestureInferenceModel:
         )
 
     @timeit
-    def infer(self, audio_file_path: str, dest_path: Optional[str] = None) -> Optional[str]:
+    def generate(self, audio_file_path: str) -> Optional[str]:
         config = self.config
 
         assert config is not None, "Model not loaded"
@@ -473,7 +473,6 @@ class GestureInferenceModel:
                 xform_orthogonalize_from_xy(V_ltxy).detach().cpu().numpy())
 
             result_path = os.path.join(tempfile.gettempdir(), f"{uuid4()}.bvh")
-            fixed_path = dest_path or os.path.join(tempfile.gettempdir(), f"{uuid4()}.bvh")
 
             try:
                 bvh_data = write_bvh(
@@ -497,19 +496,34 @@ class GestureInferenceModel:
                     self.prev_anim["rotations"] = self.prev_anim["rotations"][-4:]
                     self.prev_anim["positions"] = self.prev_anim["positions"][-4:]
 
-                reset_pose(result_path, fixed_path)
-
-                with open(fixed_path, "r") as f:
-                    result = f.read()
-
-                os.remove(result_path)
-                if dest_path is None:
-                    os.remove(fixed_path)
-
-                return result
+                return result_path
             except (PermissionError, OSError) as e:
                 print(e)
                 return None
+
+    @timeit
+    def post_process(self, result_path: str, dest_path: Optional[str] = None) -> str:
+        fixed_path = dest_path or os.path.join(tempfile.gettempdir(), f"{uuid4()}.bvh")
+
+        reset_pose(result_path, fixed_path)
+
+        with open(fixed_path, "r") as f:
+            result = f.read()
+
+        os.remove(result_path)
+
+        if dest_path is None:
+            os.remove(fixed_path)
+
+        return result
+
+    @timeit
+    def infer(self, audio_file_path: str, dest_path: Optional[str] = None) -> Optional[str]:
+        result_path = self.generate(audio_file_path)
+        if result_path is None:
+            return None
+
+        return self.post_process(result_path, dest_path)
 
 
 if __name__ == "__main__":
