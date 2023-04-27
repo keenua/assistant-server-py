@@ -18,17 +18,16 @@ async def process(prompt: str, websocket: WebSocketServerProtocol) -> None:
         if isinstance(statement, SayStatement):
             data = statement.__dict__.copy()
 
-            audio = generate_speech(statement.text)
+            async for audio in generate_speech(statement.text):
+                wav_file = "temp.wav"
+                mp3_to_wav(audio, wav_file)
 
-            wav_file = "temp.wav"
-            mp3_to_wav(audio, wav_file)
+                data["audio"] = bytes_to_base64(audio)
+                data["bvh"] = model.infer(wav_file)
 
-            data["audio"] = bytes_to_base64(audio)
-            data["bvh"] = model.infer(wav_file)
+                os.remove(wav_file)
 
-            os.remove(wav_file)
-
-            await websocket.send(json.dumps(data))
+                await websocket.send(json.dumps(data))
 
 
 async def handle_connection(websocket: WebSocketServerProtocol, path: str) -> None:
@@ -56,18 +55,23 @@ async def start():
         await asyncio.Future()
 
 if __name__ == "__main__":
-    text = "Hello, my name is Rachel."
-    audio = generate_speech(text)
+    async def main():
+        text = "I've been replaying that moment in my head, over and over again. The moment I found out the truth, the truth about you, and the truth about us. You know, I've always had this vision of the perfect relationship, and I thought I had found it in you. I thought we were a team, two people who had each other's back, no matter what. But I guess I was wrong."
+        index = 0
+        async for audio in generate_speech(text):
+            wav_file = "temp.wav"
+            mp3_to_wav(audio, wav_file)
 
-    wav_file = "temp.wav"
-    mp3_to_wav(audio, wav_file)
+            data = {}
+            data["text"] = text
+            data["audio"] = bytes_to_base64(audio)
+            data["bvh"] = model.infer(wav_file)
 
-    data = {}
-    data["text"] = text
-    data["audio"] = bytes_to_base64(audio)
-    data["bvh"] = model.infer(wav_file)
+            os.remove(wav_file)
 
-    os.remove(wav_file)
+            with open(f"temp{index}.json", "w") as file:
+                json.dump(data, file)
 
-    with open("temp.json", "w") as file:
-        json.dump(data, file)
+            index += 1
+
+    asyncio.run(main())

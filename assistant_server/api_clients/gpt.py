@@ -1,12 +1,13 @@
+import json
 import re
 import os
 import asyncio
-from typing import AsyncGenerator, List, Optional
-import openai
-from openai.openai_object import OpenAIObject
+from typing import AsyncGenerator, Iterator, List, Optional
+import aiohttp
 from dotenv import load_dotenv
 
 load_dotenv()
+API_KEY = os.getenv("OPENAI_API_KEY")
 
 
 class Statement:
@@ -59,7 +60,7 @@ class StatementTransformer:
         self.buffer = re.sub(say_regex, "", self.buffer)
         return SayStatement(text, emotion, gesture)
 
-    def transform(self, chunk: OpenAIObject) -> Optional[list[Statement]]:
+    def transform(self, chunk: dict) -> Optional[list[Statement]]:
         if not chunk.get("choices"):
             return None
 
@@ -84,30 +85,64 @@ class StatementTransformer:
         return statements
 
 
+def parse_stream_helper(line: bytes) -> Optional[str]:
+    if line:
+        if line.strip() == b"data: [DONE]":
+            # return here will cause GeneratorExit exception in urllib3
+            # and it will close http connection with TCP Reset
+            return None
+        if line.startswith(b"data: "):
+            line = line[len(b"data: "):]
+            return line.decode("utf-8")
+        else:
+            return None
+    return None
+
+
+def parse_stream(rbody: Iterator[bytes]) -> Iterator[str]:
+    for line in rbody:
+        _line = parse_stream_helper(line)
+        if _line is not None:
+            yield _line
+
+
+async def parse_stream_async(rbody: aiohttp.StreamReader):
+    async for line in rbody:
+        _line = parse_stream_helper(line)
+        if _line is not None:
+            yield _line
+
+
+async def stream(prompt: str, system_prompt: str, model: str) -> AsyncGenerator[str, None]:
+    body = {
+        "model": model,
+        "messages": [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": prompt}
+        ],
+        "max_tokens": 2000,
+        "n": 1,
+        "temperature": 0.7,
+        "stream": True
+    }
+
+    async with aiohttp.ClientSession() as session:
+        async with session.post("https://api.openai.com/v1/chat/completions", json=body, headers={"Authorization": f"Bearer {API_KEY}"}) as resp:
+            async for data in parse_stream_async(resp.content):
+                yield data
+
+
 async def gpt(user_prompt: str) -> AsyncGenerator[Statement, None]:
     current_dir = os.path.dirname(os.path.realpath(__file__))
     with open(f"{current_dir}/configs/system_prompt.txt", "r") as f:
         system_prompt = f.read()
 
     print(f"Asking GPT-4 for {user_prompt}")
-
-    openai.api_key = os.getenv("OPENAI_API_KEY")
-
-    response = openai.ChatCompletion.create(
-        model="gpt-4",
-        messages=[
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": user_prompt}
-        ],
-        max_tokens=2000,
-        n=1,
-        stop=None,
-        temperature=0.7,
-        stream=True
-    )
-
     statement_transformer = StatementTransformer()
-    for chunk in response:
+
+    async for data in stream(user_prompt, system_prompt, "gpt-4"):
+        chunk = json.loads(data)
+
         statements = statement_transformer.transform(chunk)
 
         if statements:
