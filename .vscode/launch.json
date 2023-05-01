@@ -20,6 +20,13 @@
             "justMyCode": true
         },
         {
+            "name": "Python: Combo Server Module",
+            "type": "python",
+            "request": "launch",
+            "module": "assistant_server.server.combo_server",
+            "justMyCode": true
+        },
+        {
             "name": "Python: Gesture Module",
             "type": "python",
             "request": "launch",

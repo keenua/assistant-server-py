@@ -1,45 +1,49 @@
 import asyncio
 import json
 import os
+from typing import Awaitable, Callable, List
 
 from websockets.server import WebSocketServerProtocol, serve
 
 from assistant_server.api_clients.gpt import SayStatement, gpt
-from assistant_server.api_clients.speech import generate_speech
-from assistant_server.gesture_generation.inference import GestureInferenceModel
-from assistant_server.server.utils import bytes_to_base64, mp3_to_wav
-
-model = GestureInferenceModel()
-model.load_model()
+from assistant_server.server.director import Director, Frame, StatementData
 
 
-async def process(prompt: str, websocket: WebSocketServerProtocol) -> None:
+async def process(prompt: str, director: Director) -> None:
     async for statement in gpt(prompt):
         if isinstance(statement, SayStatement):
-            data = statement.__dict__.copy()
+            statement_data = StatementData(statement.text, statement.emotion)
+            director.add_statement(statement_data)
 
-            async for audio in generate_speech(statement.text):
-                wav_file = "temp.wav"
-                mp3_to_wav(audio, wav_file)
 
-                data["audio"] = bytes_to_base64(audio)
-                data["bvh"] = model.infer(wav_file)
+async def send_frames(director: Director, on_frames: Callable[[List[Frame]], Awaitable[None]]) -> None:
+    while True:
+        frames = director.get_frames()
 
-                os.remove(wav_file)
-
-                await websocket.send(json.dumps(data))
+        if frames:
+            await on_frames(frames)
+        else:
+            await asyncio.sleep(0.1)
 
 
 async def handle_connection(websocket: WebSocketServerProtocol, path: str) -> None:
     print("Client connected")
+    director = Director()
+    director.start()
+
+    async def process_frames(frames: List[Frame]):
+        await websocket.send(json.dumps(frames))
 
     try:
-        async for message in websocket:
-            message_str = message.decode(
-                "utf-8") if isinstance(message, bytes) else message
-            print(f"Received message: {message_str}")
-            await process(message_str, websocket)
-            print("GPT done")
+        asyncio.create_task(send_frames(director, process_frames))
+
+        while True:
+            async for message in websocket:
+                message_str = message.decode(
+                    "utf-8") if isinstance(message, bytes) else message
+                print(f"Received message: {message_str}")
+                await process(message_str, director)
+                print("GPT done")
 
     except Exception as error:
         print(f"GPT error: {error}")
@@ -55,23 +59,29 @@ async def start():
         await asyncio.Future()
 
 if __name__ == "__main__":
+    index: int = 0
+    current_dir = os.path.dirname(os.path.realpath(__file__))
+
+    async def log_frames(frames: List[Frame]):
+        global index
+        with open(f"{current_dir}/../../data/results/temp{index}.json", "w") as file:
+            data = [frame.__dict__ for frame in frames]
+            json.dump(data, file)
+        index += 1
+
     async def main():
-        text = "I've been replaying that moment in my head, over and over again. The moment I found out the truth, the truth about you, and the truth about us. You know, I've always had this vision of the perfect relationship, and I thought I had found it in you. I thought we were a team, two people who had each other's back, no matter what. But I guess I was wrong."
-        index = 0
-        async for audio in generate_speech(text):
-            wav_file = "temp.wav"
-            mp3_to_wav(audio, wav_file)
+        text = "Recite a famous Al Pacino's monologue"
+        director = Director()
+        director.start()
 
-            data = {}
-            data["text"] = text
-            data["audio"] = bytes_to_base64(audio)
-            data["bvh"] = model.infer(wav_file)
+        asyncio.create_task(send_frames(director, on_frames=log_frames))
 
-            os.remove(wav_file)
+        await process(text, director)
 
-            with open(f"temp{index}.json", "w") as file:
-                json.dump(data, file)
+        while not director.is_idle():
+            await asyncio.sleep(0.1)
 
-            index += 1
+        await asyncio.sleep(4)
 
+    asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
     asyncio.run(main())

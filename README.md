@@ -10,6 +10,12 @@ conda activate assistant
 conda install -c conda-forge sox
 ```
 
+Download the allosaurus model:
+
+```bash
+python -m allosaurus.bin.download_model -m eng2102
+```
+
 ## Running the server
 
 ```bash

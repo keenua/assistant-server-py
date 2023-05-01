@@ -37,7 +37,13 @@ async def get_chunks(generator: AsyncGenerator[bytes, None], chunk_size: int) ->
         yield chunk
 
 
-async def generate_speech(text: str, chunk_size: int = 8000 * 5, voice_id: str = "21m00Tcm4TlvDq8ikWAM", stability: float = 0.35, similarity: float = 0.7) -> AsyncGenerator[bytes, None]:
+async def generate_speech(
+    text: str,
+    chunk_size: int = 8000 * 2,
+    voice_id: str = "21m00Tcm4TlvDq8ikWAM",
+    stability: float = 0.35,
+    similarity: float = 0.7
+) -> AsyncGenerator[bytes, None]:
     async for chunk in get_chunks(stream(text, voice_id, stability, similarity), chunk_size):
         yield chunk
 

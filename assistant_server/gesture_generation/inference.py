@@ -194,7 +194,7 @@ class GestureInferenceModel:
                     style_embeddding = torch.zeros((1, 64), dtype=torch.float32, device=device)
                     style_embeddding[0, style_index] = 1.0
                     style_encodings.append(style_embeddding)
-                    
+
                     base_pos = self.load_first_pose(self.prev_anim)
                 else:
                     raise ValueError("Unknown style encoding type")
@@ -311,7 +311,8 @@ class GestureInferenceModel:
         device = self.config.device
 
         if anim_data is None:
-            anim_data = bvh.load("data/zeggs/styles/first_pose.bvh")
+            current_dir = Path(__file__).parent
+            anim_data = bvh.load(f"{current_dir}/../../data/zeggs/styles/first_pose.bvh")
 
         (
             root_pos,
@@ -355,7 +356,7 @@ class GestureInferenceModel:
         )
 
     @timeit
-    def generate(self, audio_file_path: str) -> Optional[str]:
+    def generate(self, audio_file_path: Optional[str]) -> Optional[str]:
         config = self.config
 
         assert config is not None, "Model not loaded"
@@ -363,29 +364,37 @@ class GestureInferenceModel:
         self.style_encoding, self.base_pos = self.load_style_encoding()
 
         with torch.no_grad():
-            # Load Audio
-            _, audio_data = read_wavfile(
-                audio_file_path,
-                rescale=True,
-                desired_fs=16000,
-                desired_nb_channels=None,
-                out_type="float32",
-                logger=None,
-            )
+            if audio_file_path is None:
+                audio_features = torch.zeros(
+                    (242, 81), device=config.device, dtype=torch.float32
+                )
+            else:
+                # Load Audio
+                _, audio_data = read_wavfile(
+                    audio_file_path,
+                    rescale=True,
+                    desired_fs=16000,
+                    desired_nb_channels=None,
+                    out_type="float32",
+                    logger=None,
+                )
 
-            n_frames = int(round(60.0 * (len(audio_data) / 16000)))
+                n_frames = int(round(60.0 * (len(audio_data) / 16000)))
 
-            audio_features = torch.as_tensor(
-                preprocess_audio(
-                    audio_data,
-                    60,
-                    n_frames,
-                    config.data_pipeline_conf.audio_conf,
-                    feature_type=config.data_pipeline_conf.audio_feature_type,
-                ),
-                device=config.device,
-                dtype=torch.float32,
-            )
+                audio_features = torch.as_tensor(
+                    preprocess_audio(
+                        audio_data,
+                        60,
+                        n_frames,
+                        config.data_pipeline_conf.audio_conf,
+                        feature_type=config.data_pipeline_conf.audio_feature_type,
+                    ),
+                    device=config.device,
+                    dtype=torch.float32,
+                )
+
+                audio_features = torch.nan_to_num(audio_features)
+
             speech_encoding = config.network_speech_encoder_script(
                 (audio_features[np.newaxis] -
                  config.audio_input_mean) / config.audio_input_std
@@ -518,12 +527,22 @@ class GestureInferenceModel:
         return result
 
     @timeit
-    def infer(self, audio_file_path: str, dest_path: Optional[str] = None) -> Optional[str]:
+    def infer(self, audio_file_path: Optional[str], dest_path: Optional[str] = None) -> Optional[str]:
         result_path = self.generate(audio_file_path)
         if result_path is None:
             return None
 
         return self.post_process(result_path, dest_path)
+
+    @timeit
+    def infer_motions(self, audio_file_path: Optional[str]) -> List[str]:
+        result_path = self.generate(audio_file_path)
+        if result_path is None:
+            return []
+
+        with open(result_path, "r") as f:
+            result = f.readlines()
+            return result[464:-2]
 
 
 if __name__ == "__main__":
