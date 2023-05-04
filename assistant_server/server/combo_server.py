@@ -32,7 +32,11 @@ async def handle_connection(websocket: WebSocketServerProtocol, path: str) -> No
     director.start()
 
     async def process_frames(frames: List[Frame]):
-        await websocket.send(json.dumps(frames))
+        print(f"Sending {len(frames)} frames")
+        result = {
+            "frames": {frame.index: frame.__dict__ for frame in frames}
+        }
+        await websocket.send(json.dumps(result))
 
     try:
         asyncio.create_task(send_frames(director, process_frames))

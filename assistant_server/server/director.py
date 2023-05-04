@@ -88,10 +88,10 @@ class Director:
             frame = Frame(
                 index=self.frame_index,
                 motion=motion.strip(),
-                audio=audio_base64,
-                emotion=emotion,
-                text=text,
-                viseme=viseme,
+                audio=audio_base64 or "",
+                emotion=emotion or "",
+                text=text or "",
+                viseme=viseme or "",
             )
             result.append(frame)
 
@@ -124,13 +124,14 @@ class Director:
                 frames = self.__generate_from_audio(audio, statement.emotion, statement.text)
             elif not self.buffered():
                 frames = self.__generate_silence()
+                # frames = []
 
             for frame in frames:
                 yield frame
 
             self.processing = not task_empty or bool(buffer)
 
-            print(f"Buffer: {self.get_buffer_time()}")
+            # print(f"Buffer: {self.get_buffer_time()}")
             await asyncio.sleep(0.1)
 
     async def __run(self):

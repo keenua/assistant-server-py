@@ -1,6 +1,9 @@
 import os
+from typing import Tuple
 
 import bvhio
+import numpy as np
+from torch import Tensor
 
 
 def reset_pose(source: str, destination: str):
@@ -22,6 +25,25 @@ def reset_pose(source: str, destination: str):
 
     print('| Write file')
     bvhio.writeHierarchy(path=destination, root=root, frameTime=1/60)
+
+
+def smooth_stiching(positions: Tensor, rotations: Tensor, prev_anim: dict, nframes: int = 30) -> Tuple[Tensor, Tensor]:
+    if prev_anim is None:
+        return positions, rotations
+
+    prev_positions = prev_anim['positions']
+    prev_rotations = prev_anim['rotations']
+
+    nframes = min(nframes, positions.shape[0])
+    interpolated_positions = positions[0:nframes] * (1 - 1.0 / nframes * (nframes - np.arange(nframes))[:, np.newaxis, np.newaxis])
+    interpolated_prev_positions = prev_positions[-1] * (1.0 / nframes * (nframes - np.arange(nframes))[:, np.newaxis, np.newaxis])
+    positions[0:nframes] = interpolated_positions + interpolated_prev_positions
+
+    interpolated_rotations = rotations[0:nframes] * (1 - 1.0 / nframes * (nframes - np.arange(nframes))[:, np.newaxis, np.newaxis])
+    interpolated_prev_rotations = prev_rotations[-1] * (1.0 / nframes * (nframes - np.arange(nframes))[:, np.newaxis, np.newaxis])
+    rotations[0:nframes] = interpolated_rotations + interpolated_prev_rotations
+
+    return positions, rotations
 
 
 if __name__ == "__main__":

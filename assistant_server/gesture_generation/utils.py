@@ -5,6 +5,7 @@ import numpy as np
 from scipy import interpolate
 
 from assistant_server.gesture_generation.anim import bvh, quat
+from assistant_server.gesture_generation.postprocessing import smooth_stiching
 
 
 def change_bvh(filename, savename, order=None, fps=None, pace=1.0, center=False):
@@ -66,6 +67,7 @@ def write_bvh(
         dt,
         start_position=None,
         start_rotation=None,
+        prev_anim=None,
 ) -> dict:
     if start_position is not None and start_rotation is not None:
         offset_pos = V_root_pos[0:1].copy()
@@ -88,14 +90,20 @@ def write_bvh(
     V_lpos[:, 0] = quat.mul_vec(V_root_rot, V_lpos[:, 0]) + V_root_pos
     V_lrot[:, 0] = quat.mul(V_root_rot, V_lrot[:, 0])
 
+    positions = orig_V_lpos
+    rotations = np.degrees(quat.to_euler(orig_V_lrot, order=order))
+
+    if prev_anim is not None:
+        positions, rotations = smooth_stiching(positions, rotations, prev_anim)
+
     bvh_data = dict(
         order=order,
         offsets=V_lpos[0],
         names=names,
         frametime=dt,
         parents=parents,
-        positions=orig_V_lpos,
-        rotations=np.degrees(quat.to_euler(orig_V_lrot, order=order)),
+        positions=positions,
+        rotations=rotations,
     )
 
     bvh.save(filename, bvh_data)

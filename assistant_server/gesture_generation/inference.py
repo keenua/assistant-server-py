@@ -19,7 +19,7 @@ from assistant_server.gesture_generation.audio.audio_files import read_wavfile
 from assistant_server.gesture_generation.data_pipeline import (
     preprocess_animation, preprocess_audio)
 from assistant_server.gesture_generation.helpers import split_by_ratio
-from assistant_server.gesture_generation.postprocessing import reset_pose
+from assistant_server.gesture_generation.postprocessing import reset_pose, smooth_stiching
 from assistant_server.gesture_generation.utils import timeit, write_bvh
 
 
@@ -150,15 +150,15 @@ class GestureInferenceModel:
                         gaze_pos, dtype=torch.float32, device=device)
 
                     base_pos = BasePos(
-                        root_pos=root_pos,
-                        root_rot=root_rot,
-                        root_vel=root_vel,
-                        root_vrt=root_vrt,
-                        lpos=lpos,
-                        ltxy=ltxy,
-                        lvel=lvel,
-                        lvrt=lvrt,
-                        gaze_pos=gaze_pos,
+                        root_pos=torch.nan_to_num(root_pos),
+                        root_rot=torch.nan_to_num(root_rot),
+                        root_vel=torch.nan_to_num(root_vel),
+                        root_vrt=torch.nan_to_num(root_vrt),
+                        lpos=torch.nan_to_num(lpos),
+                        ltxy=torch.nan_to_num(ltxy),
+                        lvel=torch.nan_to_num(lvel),
+                        lvrt=torch.nan_to_num(lvrt),
+                        gaze_pos=torch.nan_to_num(gaze_pos),
                     )
 
                     S_root_vel = root_vel.reshape(nframes, -1)
@@ -312,7 +312,9 @@ class GestureInferenceModel:
 
         if anim_data is None:
             current_dir = Path(__file__).parent
-            anim_data = bvh.load(f"{current_dir}/../../data/zeggs/styles/first_pose.bvh")
+            anim_data = bvh.load(f"{current_dir}/../../data/zeggs/styles/first_pose_neutral.bvh")
+            anim_data["rotations"] = anim_data["rotations"][-4:]
+            anim_data["positions"] = anim_data["positions"][-4:]
 
         (
             root_pos,
@@ -344,20 +346,23 @@ class GestureInferenceModel:
         gaze_pos = torch.as_tensor(gaze_pos, dtype=torch.float32, device=device)
 
         return BasePos(
-            root_pos=root_pos,
-            root_rot=root_rot,
-            root_vel=root_vel,
-            root_vrt=root_vrt,
-            lpos=lpos,
-            ltxy=ltxy,
-            lvel=lvel,
-            lvrt=lvrt,
-            gaze_pos=gaze_pos,
+            root_pos=torch.nan_to_num(root_pos),
+            root_rot=torch.nan_to_num(root_rot),
+            root_vel=torch.nan_to_num(root_vel),
+            root_vrt=torch.nan_to_num(root_vrt),
+            lpos=torch.nan_to_num(lpos),
+            ltxy=torch.nan_to_num(ltxy),
+            lvel=torch.nan_to_num(lvel),
+            lvrt=torch.nan_to_num(lvrt),
+            gaze_pos=torch.nan_to_num(gaze_pos),
         )
 
     @timeit
     def generate(self, audio_file_path: Optional[str]) -> Optional[str]:
         config = self.config
+        seed = np.random.randint(0, 1000000)
+        np.random.seed(seed)
+        torch.manual_seed(seed)
 
         assert config is not None, "Model not loaded"
 
@@ -486,24 +491,26 @@ class GestureInferenceModel:
             try:
                 bvh_data = write_bvh(
                     result_path,
-                    V_root_pos[0].detach().cpu().numpy(),
-                    V_root_rot[0].detach().cpu().numpy(),
-                    V_lpos[0].detach().cpu().numpy(),
+                    torch.nan_to_num(V_root_pos[0]).detach().cpu().numpy(),
+                    torch.nan_to_num(V_root_rot[0]).detach().cpu().numpy(),
+                    torch.nan_to_num(V_lpos[0]).detach().cpu().numpy(),
                     V_lrot[0],
-                    parents=config.parents.detach().cpu().numpy(),
+                    parents=torch.nan_to_num(config.parents).detach().cpu().numpy(),
                     names=config.bones,
                     order="zyx",
                     dt=config.dt,
                     start_position=np.array([0, 0, 0]),
                     start_rotation=np.array([1, 0, 0, 0]),
+                    prev_anim=self.prev_anim
                 )
 
                 self.prev_anim = bvh_data
 
                 # take last 4 frames only
-                if self.prev_anim["rotations"].shape[0] > 4:
-                    self.prev_anim["rotations"] = self.prev_anim["rotations"][-4:]
-                    self.prev_anim["positions"] = self.prev_anim["positions"][-4:]
+                take_frames = 4
+                if self.prev_anim["rotations"].shape[0] > take_frames:
+                    self.prev_anim["rotations"] = self.prev_anim["rotations"][-take_frames:]
+                    self.prev_anim["positions"] = self.prev_anim["positions"][-take_frames:]
 
                 return result_path
             except (PermissionError, OSError) as e:
@@ -536,18 +543,15 @@ class GestureInferenceModel:
 
     @timeit
     def infer_motions(self, audio_file_path: Optional[str]) -> List[str]:
-        result_path = self.generate(audio_file_path)
-        if result_path is None:
-            return []
-
-        with open(result_path, "r") as f:
-            result = f.readlines()
-            return result[464:-2]
+        data = self.infer(audio_file_path)
+        lines = data.split("\n")
+        return lines[464:-2]
 
 
 if __name__ == "__main__":
-    model = GestureInferenceModel()
+    # model = GestureInferenceModel()
 
-    model.load_model()
-    model.infer("data/samples/barefoot.wav", "part1.bvh")
-    model.infer("data/samples/barefoot.wav", "part2.bvh")
+    # model.load_model()
+    # model.infer("data/samples/barefoot.wav", "part1.bvh")
+    # model.infer("data/samples/barefoot.wav", "part2.bvh")
+    reset_pose("data/zeggs/styles/first_pose_neutral.bvh", "data/zeggs/styles/first_pose_neutral_fixed.bvh")
