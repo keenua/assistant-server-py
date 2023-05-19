@@ -44,6 +44,8 @@ class Director:
         self.frame_buffer: List[Frame] = []
         self.processing = False
 
+        self.run_task: Optional[asyncio.Task] = None
+
     def add_statement(self, statement: StatementData) -> None:
         print(f"Statement added: {statement.text}")
         self.processing = True
@@ -73,7 +75,7 @@ class Director:
             audio_base64 = bytes_to_base64(audio)
 
         motions = self.gesture_model.infer_motions(wav_file)
-        visemes = self.viseme_model.recognize(wav_file) if audio else []
+        visemes = self.viseme_model.recognize(wav_file) if wav_file else []
 
         if wav_file:
             os.remove(wav_file)
@@ -115,11 +117,13 @@ class Director:
             frames: List[Frame] = []
             task_empty = fill_buffer_task is None or fill_buffer_task.done()
 
+            statement: Optional[StatementData] = None
+
             if self.statement_queue and task_empty:
                 statement = self.statement_queue.pop(0)
                 fill_buffer_task = asyncio.create_task(self.__fill_audio_buffer(statement.text, buffer))
 
-            if buffer:
+            if buffer and statement:
                 audio = buffer.pop(0)
                 frames = self.__generate_from_audio(audio, statement.emotion, statement.text)
             elif not self.buffered():
@@ -143,7 +147,15 @@ class Director:
         self.statement_queue.clear()
         self.frame_index = 0
         self.frame_buffer.clear()
-        asyncio.ensure_future(self.__run())
+
+        if self.run_task:
+            self.run_task.cancel()
+
+        self.run_task = asyncio.ensure_future(self.__run())
+
+    def stop(self):
+        if self.run_task:
+            self.run_task.cancel()
 
     def get_frames(self, max_frames: int = 0) -> List[Frame]:
         frames_to_take = max_frames if max_frames else self.FPS

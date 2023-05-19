@@ -1,19 +1,28 @@
 import asyncio
 import json
 import os
-from typing import Awaitable, Callable, List
+import time
+from typing import Awaitable, Callable, List, Optional
 
 from websockets.server import WebSocketServerProtocol, serve
+from websockets.exceptions import ConnectionClosed
 
 from assistant_server.api_clients.gpt import SayStatement, gpt
 from assistant_server.server.director import Director, Frame, StatementData
 
+last_ping_time = time.time()
 
-async def process(prompt: str, director: Director) -> None:
+async def process_prompt(prompt: str, director: Director) -> None:
     async for statement in gpt(prompt):
         if isinstance(statement, SayStatement):
             statement_data = StatementData(statement.text, statement.emotion)
             director.add_statement(statement_data)
+
+
+async def process_queue(queue: asyncio.Queue[str], director: Director) -> None:
+    while True:
+        prompt = await queue.get()
+        await process_prompt(prompt, director)
 
 
 async def send_frames(director: Director, on_frames: Callable[[List[Frame]], Awaitable[None]]) -> None:
@@ -25,36 +34,85 @@ async def send_frames(director: Director, on_frames: Callable[[List[Frame]], Awa
         else:
             await asyncio.sleep(0.1)
 
+async def check_heartbeat(disconnect_timeout=6):
+    while True:
+        global last_ping_time
+        await asyncio.sleep(disconnect_timeout)
+        if time.time() - last_ping_time > disconnect_timeout:
+            print("Ping timeout, raising close exception")
+            raise ConnectionClosed(None, None)
+
+async def handle_messages(websocket: WebSocketServerProtocol, processing_queue: asyncio.Queue[str]):
+    while True:
+        try:
+            message = await websocket.recv()
+            
+            message_str = message.decode(
+                "utf-8") if isinstance(message, bytes) else message
+            print(f"Received message: {message_str}")
+
+            if message_str == "ping":
+                global last_ping_time
+                last_ping_time = time.time()
+            else:
+                processing_queue.put_nowait(message_str)
+        except:
+            print("Error receiving message")
+            break
 
 async def handle_connection(websocket: WebSocketServerProtocol, path: str) -> None:
     print("Client connected")
+    
     director = Director()
     director.start()
 
     async def process_frames(frames: List[Frame]):
         print(f"Sending {len(frames)} frames")
         result = {
-            "frames": {frame.index: frame.__dict__ for frame in frames}
+            "frames": [frame.__dict__ for frame in frames]
         }
-        await websocket.send(json.dumps(result))
+        try:
+            await websocket.send(json.dumps(result))
+        except ConnectionClosed as e:
+            print("Connection closed")
+            raise e
+
+    processing_queue: asyncio.Queue[str] = asyncio.Queue()
+    process_queue_task: Optional[asyncio.Task] = None
+    handle_messages_task: Optional[asyncio.Task] = None
+    send_frames_task: Optional[asyncio.Task] = None
+    heartbeat_task: Optional[asyncio.Task] = None
+
 
     try:
-        asyncio.create_task(send_frames(director, process_frames))
+        process_queue_task = asyncio.ensure_future(
+            process_queue(processing_queue, director))
 
-        while True:
-            async for message in websocket:
-                message_str = message.decode(
-                    "utf-8") if isinstance(message, bytes) else message
-                print(f"Received message: {message_str}")
-                await process(message_str, director)
-                print("GPT done")
+        send_frames_task = asyncio.ensure_future(
+            send_frames(director, process_frames))
+        
+        handle_messages_task = asyncio.ensure_future(
+            handle_messages(websocket, processing_queue))
 
-    except Exception as error:
-        print(f"GPT error: {error}")
+        heartbeat_task = asyncio.ensure_future(
+            check_heartbeat())
+        heartbeat_task.add_done_callback(lambda _: handle_messages_task.cancel())
 
+        print("Waiting for messages")
+        
+        await handle_messages_task
+    
     finally:
         print("Client disconnected")
+        
+        if process_queue_task:
+            process_queue_task.cancel()
+        if send_frames_task:
+            send_frames_task.cancel()
+        if heartbeat_task:
+            heartbeat_task.cancel()
 
+        director.stop()
 
 async def start():
     port = 3000
@@ -80,7 +138,7 @@ if __name__ == "__main__":
 
         asyncio.create_task(send_frames(director, on_frames=log_frames))
 
-        await process(text, director)
+        await process_prompt(text, director)
 
         while not director.is_idle():
             await asyncio.sleep(0.1)

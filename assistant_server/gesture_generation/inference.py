@@ -312,7 +312,7 @@ class GestureInferenceModel:
 
         if anim_data is None:
             current_dir = Path(__file__).parent
-            anim_data = bvh.load(f"{current_dir}/../../data/zeggs/styles/first_pose_neutral.bvh")
+            anim_data = bvh.load(f"{current_dir}/../../data/zeggs/styles/old.bvh")
             anim_data["rotations"] = anim_data["rotations"][-4:]
             anim_data["positions"] = anim_data["positions"][-4:]
 
