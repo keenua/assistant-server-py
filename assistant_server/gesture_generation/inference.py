@@ -19,7 +19,7 @@ from assistant_server.gesture_generation.audio.audio_files import read_wavfile
 from assistant_server.gesture_generation.data_pipeline import (
     preprocess_animation, preprocess_audio)
 from assistant_server.gesture_generation.helpers import split_by_ratio
-from assistant_server.gesture_generation.postprocessing import reset_pose, smooth_stiching
+from assistant_server.gesture_generation.postprocessing import reset_pose
 from assistant_server.gesture_generation.utils import timeit, write_bvh
 
 
@@ -371,7 +371,7 @@ class GestureInferenceModel:
         with torch.no_grad():
             if audio_file_path is None:
                 audio_features = torch.zeros(
-                    (242, 81), device=config.device, dtype=torch.float32
+                    (122, 81), device=config.device, dtype=torch.float32
                 )
             else:
                 # Load Audio

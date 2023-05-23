@@ -1,6 +1,6 @@
 import asyncio
 from os import getenv
-from typing import AsyncGenerator
+from typing import AsyncGenerator, List
 import aiohttp
 
 from dotenv import load_dotenv
@@ -11,7 +11,7 @@ load_dotenv()
 API_KEY = getenv("ELEVENLABS_API_KEY")
 
 
-async def stream(text: str, voice_id: str = "21m00Tcm4TlvDq8ikWAM", stability: float = 0.35, similarity: float = 0.7) -> AsyncGenerator[bytes, None]:
+async def generate_speech(text: str, chunk_size: int = 8000 * 2, voice_id: str = "21m00Tcm4TlvDq8ikWAM", stability: float = 0.35, similarity: float = 0.7) -> AsyncGenerator[bytes, None]:
     body = {
         "text": text,
         "voice_settings": {
@@ -22,31 +22,27 @@ async def stream(text: str, voice_id: str = "21m00Tcm4TlvDq8ikWAM", stability: f
 
     async with aiohttp.ClientSession() as session:
         async with session.post(f"https://api.elevenlabs.io/v1/text-to-speech/{voice_id}/stream", json=body, headers={"xi-api-key": API_KEY}) as resp:
-            async for data, _ in resp.content.iter_chunks():
-                yield data
+            buffer: List[bytes] = []
+            buffer_size = 0
+            async for data in resp.content.iter_chunked(chunk_size):
+                buffer.append(data)
+                buffer_size += len(data)
+                if buffer_size >= chunk_size * 2:
+                    chunk = buffer.pop(0)
 
-
-async def get_chunks(generator: AsyncGenerator[bytes, None], chunk_size: int) -> AsyncGenerator[bytes, None]:
-    chunk = b""
-    async for data in generator:
-        chunk += data
-        if len(chunk) >= chunk_size * 3 / 2:
-            yield chunk[:chunk_size]
-            chunk = chunk[chunk_size:]
-    if chunk:
-        yield chunk
-
-
-async def generate_speech(
-    text: str,
-    chunk_size: int = 8000 * 2,
-    voice_id: str = "21m00Tcm4TlvDq8ikWAM",
-    stability: float = 0.35,
-    similarity: float = 0.7
-) -> AsyncGenerator[bytes, None]:
-    async for chunk in get_chunks(stream(text, voice_id, stability, similarity), chunk_size):
-        yield chunk
-
+                    size = len(chunk)
+                    while size < chunk_size:
+                        chunk += buffer.pop(0)
+                        size += len(chunk)
+                    
+                    buffer_size -= len(chunk)
+                    print("yielding chunk (%d)" % len(chunk))
+                    yield chunk
+            
+            if buffer:
+                chunk = b"".join(buffer)
+                print("yielding last chunk (%d)" % len(chunk))
+                yield chunk
 
 if __name__ == "__main__":
     async def main():

@@ -1,7 +1,8 @@
+import os
 import pydub
 import base64
 import io
-
+from elevenlabs import play
 
 def mp3_to_wav(audio: bytes, dest_path: str) -> bytes:
     mp3 = io.BytesIO(audio)
@@ -36,6 +37,30 @@ def merge_frames(base_file: str, from_folder: str):
         for frame in frames:
             f.write(frame["motion"] + "\n")
 
+def visualize_logs():
+    current_dir = os.path.dirname(os.path.realpath(__file__))
+    dir = f"{current_dir}/../../data/results/frames"
+
+    import json
+
+    # for each file in dir
+    #   for each frame in file
+    for file in sorted(os.listdir(dir), key=lambda x: int(x[4:-5])):
+        with open(f"{dir}/{file}", "r") as f:
+            frames = json.load(f)
+
+            for frame in frames:
+                if frame["text"] != "" or frame["audio"] != "":
+                    print(f)
+                    print(frame["index"])
+                    print(frame["text"])
+                    print(len(frame["audio"]))
+                    audio_bytes = base64.b64decode(frame["audio"])
+                    play(audio_bytes)
+                    print("-----")
+                    input()
+
 
 if __name__ == "__main__":
-    merge_frames("data/results/sample_motion.bvh", "data/results/frames")
+    # merge_frames("data/results/sample_motion.bvh", "data/results/frames")
+    visualize_logs()

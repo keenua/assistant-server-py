@@ -1,5 +1,7 @@
 import asyncio
+import json
 import os
+
 from dataclasses import dataclass
 from time import time
 from typing import AsyncGenerator, List, Optional
@@ -27,7 +29,7 @@ class Frame:
 
 
 class Director:
-    def __init__(self, preferred_buffer_time: float = 2.0) -> None:
+    def __init__(self, preferred_buffer_time: float = 1.0) -> None:
         self.FPS = 60
         self.PREFFERED_BUFFER_TIME = preferred_buffer_time
 
@@ -65,6 +67,7 @@ class Director:
         print(f"Generating audio for: {text}")
         async for audio in generate_speech(text):
             buffer.append(audio)
+            print("Adding chunk to buffer (%d)" % len(buffer))
 
     def __generate_from_audio(self, audio: Optional[bytes], emotion: Optional[str], text: Optional[str]) -> List[Frame]:
         wav_file = "temp.wav" if audio else None
@@ -112,20 +115,22 @@ class Director:
     async def __generate_frames(self) -> AsyncGenerator[Frame, None]:
         buffer: List[bytes] = []
         fill_buffer_task: Optional[asyncio.Task] = None
+        statement: Optional[StatementData] = None
 
         while True:
             frames: List[Frame] = []
             task_empty = fill_buffer_task is None or fill_buffer_task.done()
-
-            statement: Optional[StatementData] = None
 
             if self.statement_queue and task_empty:
                 statement = self.statement_queue.pop(0)
                 fill_buffer_task = asyncio.create_task(self.__fill_audio_buffer(statement.text, buffer))
 
             if buffer and statement:
+                print("Popping chunk from buffer (%d)" % len(buffer))
                 audio = buffer.pop(0)
+                print("Generating from audio (%d)" % len(audio))
                 frames = self.__generate_from_audio(audio, statement.emotion, statement.text)
+                print("Generated from audio (%d)" % len(audio))
             elif not self.buffered():
                 frames = self.__generate_silence()
                 # frames = []
@@ -138,11 +143,22 @@ class Director:
             # print(f"Buffer: {self.get_buffer_time()}")
             await asyncio.sleep(0.1)
 
-    async def __run(self):
-        async for frame in self.__generate_frames():
+    async def __generate_frames_from_files(self, dir: str) -> AsyncGenerator[Frame, None]:
+        files = sorted(os.listdir(dir), key=lambda x: int(x[4:-5]))
+
+        for file in files:
+            with open(os.path.join(dir, file), "r") as f:
+                data = json.load(f)
+
+            for frame in data:
+                yield Frame(**frame)
+            
+    async def __run(self, dir: Optional[str] = None):
+        generator = self.__generate_frames_from_files(dir) if dir else self.__generate_frames()
+        async for frame in generator:
             self.frame_buffer.append(frame)
 
-    def start(self):
+    def start(self, frames_dir: Optional[str] = None):
         self.start_time = time()
         self.statement_queue.clear()
         self.frame_index = 0
@@ -151,7 +167,7 @@ class Director:
         if self.run_task:
             self.run_task.cancel()
 
-        self.run_task = asyncio.ensure_future(self.__run())
+        self.run_task = asyncio.ensure_future(self.__run(frames_dir))
 
     def stop(self):
         if self.run_task:
