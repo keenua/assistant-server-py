@@ -70,6 +70,7 @@ class Director:
             print("Adding chunk to buffer (%d)" % len(buffer))
 
     def __generate_from_audio(self, audio: Optional[bytes], emotion: Optional[str], text: Optional[str]) -> List[Frame]:
+        start_frame_index = self.frame_index
         wav_file = "temp.wav" if audio else None
         audio_base64: Optional[str] = None
 
@@ -85,10 +86,23 @@ class Director:
 
         result: List[Frame] = []
 
-        for motion in motions:
-            timestamp = self.frame_index / float(self.FPS)
+        viseme_end = 0
+        last_viseme_was_silence = True
 
-            viseme = visemes.pop(0).viseme if visemes and timestamp >= visemes[0].start else None
+        for motion in motions:
+            timestamp = (self.frame_index - start_frame_index) / float(self.FPS)
+
+            viseme = visemes.pop(0) if visemes and timestamp >= visemes[0].start else None
+            
+            if viseme:
+                viseme_end = viseme.start + viseme.duration
+                last_viseme_was_silence = False
+            
+            viseme_str = viseme.viseme if viseme else ""
+
+            if not viseme and timestamp >= viseme_end and not last_viseme_was_silence:
+                viseme_str = "sil"
+                last_viseme_was_silence = True
 
             frame = Frame(
                 index=self.frame_index,
@@ -96,7 +110,7 @@ class Director:
                 audio=audio_base64 or "",
                 emotion=emotion or "",
                 text=text or "",
-                viseme=viseme or "",
+                viseme=viseme_str
             )
             result.append(frame)
 

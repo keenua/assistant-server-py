@@ -13,7 +13,7 @@ from assistant_server.server.director import Director, Frame, StatementData
 last_ping_time = time.time()
 frame_package_index: int = 0
 current_dir = os.path.dirname(os.path.realpath(__file__))
-frames_dir = f"{current_dir}/../../data/results/local"
+frames_dir = f"{current_dir}/../../data/results/frames"
 
 FRAMES_FROM_FILE = False
 
