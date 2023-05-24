@@ -88,14 +88,15 @@ class Director:
 
         viseme_end = 0
         last_viseme_was_silence = True
+        offset = 0.1
 
         for motion in motions:
             timestamp = (self.frame_index - start_frame_index) / float(self.FPS)
 
-            viseme = visemes.pop(0) if visemes and timestamp >= visemes[0].start else None
+            viseme = visemes.pop(0) if visemes and timestamp >= visemes[0].start - offset else None
             
             if viseme:
-                viseme_end = viseme.start + viseme.duration
+                viseme_end = viseme.start + viseme.duration + offset 
                 last_viseme_was_silence = False
             
             viseme_str = viseme.viseme if viseme else ""
