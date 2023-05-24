@@ -81,7 +81,7 @@ class Visemes():
     @timeit
     def recognize(self, path: str) -> List[Frame]:
         topk = 1
-        emit = 1.0
+        emit = 0.7
         timestamp = True
 
         phones = self.recognizer.recognize(

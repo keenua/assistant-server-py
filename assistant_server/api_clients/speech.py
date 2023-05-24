@@ -21,7 +21,7 @@ async def generate_speech(text: str, chunk_size: int = 8000 * 2, voice_id: str =
     }
 
     async with aiohttp.ClientSession() as session:
-        async with session.post(f"https://api.elevenlabs.io/v1/text-to-speech/{voice_id}/stream", json=body, headers={"xi-api-key": API_KEY}) as resp:
+        async with session.post(f"https://api.elevenlabs.io/v1/text-to-speech/{voice_id}/stream?optimize_streaming_latency=2", json=body, headers={"xi-api-key": API_KEY}) as resp:
             buffer: List[bytes] = []
             buffer_size = 0
             async for data in resp.content.iter_chunked(chunk_size):

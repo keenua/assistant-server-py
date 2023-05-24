@@ -60,7 +60,15 @@ def visualize_logs():
                     print("-----")
                     input()
 
+def print_all_emotions(dir: str):
+    file_names = []
+    for file in sorted(os.listdir(dir)):
+        if file.endswith(".uasset"):
+            file_names.append(file[:-7])
+
+    print(file_names)
 
 if __name__ == "__main__":
     # merge_frames("data/results/sample_motion.bvh", "data/results/frames")
-    visualize_logs()
+    # visualize_logs()
+    print_all_emotions("e:\\Work\\Projects\\test_mh\\Assistant\\Content\\Animations\\Jawless")
