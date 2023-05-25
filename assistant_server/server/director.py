@@ -29,7 +29,7 @@ class Frame:
 
 
 class Director:
-    def __init__(self, preferred_buffer_time: float = 1.0) -> None:
+    def __init__(self, preferred_buffer_time: float = 2.0) -> None:
         self.FPS = 60
         self.PREFFERED_BUFFER_TIME = preferred_buffer_time
 
