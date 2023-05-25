@@ -13,7 +13,7 @@ from assistant_server.server.director import Director, Frame, StatementData
 last_ping_time = time.time()
 frame_package_index: int = 0
 current_dir = os.path.dirname(os.path.realpath(__file__))
-frames_dir = f"{current_dir}/../../data/samples/frames"
+frames_dir = f"{current_dir}/../../data/samples/frames/divorce_offset_3"
 
 FRAMES_FROM_FILE = False
 
@@ -150,7 +150,7 @@ if __name__ == "__main__":
         frame_package_index += 1
 
     async def main():
-        text = "Recite a famous Al Pacino's monologue"
+        text = "Your husband just cheated on you. Perform a monologue of breaking up with him"
         director = Director()
         director.start()
 

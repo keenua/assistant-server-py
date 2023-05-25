@@ -39,7 +39,7 @@ def merge_frames(base_file: str, from_folder: str):
 
 def visualize_logs():
     current_dir = os.path.dirname(os.path.realpath(__file__))
-    dir = f"{current_dir}/../../data/results/frames"
+    dir = f"{current_dir}/../../data/samples/frames/football"
 
     import json
 
@@ -70,5 +70,5 @@ def print_all_emotions(dir: str):
 
 if __name__ == "__main__":
     # merge_frames("data/results/sample_motion.bvh", "data/results/frames")
-    # visualize_logs()
-    print_all_emotions("e:\\Work\\Projects\\test_mh\\Assistant\\Content\\Animations\\Jawless")
+    visualize_logs()
+    # print_all_emotions("e:\\Work\\Projects\\test_mh\\Assistant\\Content\\Animations\\Jawless")
