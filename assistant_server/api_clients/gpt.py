@@ -15,13 +15,12 @@ class Statement:
 
 
 class SayStatement(Statement):
-    def __init__(self, text: str, emotion: str, gesture: str):
+    def __init__(self, text: str, emotion: str):
         self.text = text
         self.emotion = emotion
-        self.gesture = gesture
 
     def __str__(self):
-        return f"SayStatement(text=\"{self.text}\", emotion=\"{self.emotion}\", gesture=\"{self.gesture}\")"
+        return f"SayStatement(text=\"{self.text}\", emotion=\"{self.emotion}\")"
 
 
 class CodeStatement(Statement):
@@ -50,15 +49,15 @@ class StatementTransformer:
         return CodeStatement(code.strip(), language)
 
     def parse_say_from_buffer(self) -> Optional[SayStatement]:
-        say_regex = r"<poop:(.*?):(.*?)>([\s\S]*?)<\/poop>"
+        say_regex = r"<poop:(.*?)>([\s\S]*?)<\/poop>"
         match = re.search(say_regex, self.buffer)
 
         if not match:
             return None
 
-        emotion, gesture, text = match.groups()
+        emotion, text = match.groups()
         self.buffer = re.sub(say_regex, "", self.buffer)
-        return SayStatement(text, emotion, gesture)
+        return SayStatement(text, emotion)
 
     def transform(self, chunk: dict) -> Optional[list[Statement]]:
         if not chunk.get("choices"):

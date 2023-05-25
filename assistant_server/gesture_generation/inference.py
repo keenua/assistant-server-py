@@ -371,7 +371,7 @@ class GestureInferenceModel:
         with torch.no_grad():
             if audio_file_path is None:
                 audio_features = torch.zeros(
-                    (122, 81), device=config.device, dtype=torch.float32
+                    (242, 81), device=config.device, dtype=torch.float32
                 )
             else:
                 # Load Audio
