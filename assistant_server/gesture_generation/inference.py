@@ -312,7 +312,7 @@ class GestureInferenceModel:
 
         if anim_data is None:
             current_dir = Path(__file__).parent
-            anim_data = bvh.load(f"{current_dir}/../../data/zeggs/styles/old.bvh")
+            anim_data = bvh.load(f"{current_dir}/../../data/zeggs/styles/relaxed.bvh")
             anim_data["rotations"] = anim_data["rotations"][-4:]
             anim_data["positions"] = anim_data["positions"][-4:]
 
@@ -549,9 +549,8 @@ class GestureInferenceModel:
 
 
 if __name__ == "__main__":
-    # model = GestureInferenceModel()
+    model = GestureInferenceModel()
 
-    # model.load_model()
-    # model.infer("data/samples/barefoot.wav", "part1.bvh")
-    # model.infer("data/samples/barefoot.wav", "part2.bvh")
-    reset_pose("data/zeggs/styles/first_pose_neutral.bvh", "data/zeggs/styles/first_pose_neutral_fixed.bvh")
+    model.load_model()
+    model.infer("data/samples/barefoot.wav", "part1.bvh")
+    # reset_pose("data/zeggs/styles/first_pose_neutral.bvh", "data/zeggs/styles/first_pose_neutral_fixed.bvh")

@@ -69,6 +69,6 @@ def print_all_emotions(dir: str):
     print(file_names)
 
 if __name__ == "__main__":
-    # merge_frames("data/results/sample_motion.bvh", "data/results/frames")
-    visualize_logs()
+    merge_frames("data/zeggs/styles/relaxed_fixed.bvh", "data/samples/frames/divorce_offset_3")
+    # visualize_logs()
     # print_all_emotions("e:\\Work\\Projects\\test_mh\\Assistant\\Content\\Animations\\Jawless")

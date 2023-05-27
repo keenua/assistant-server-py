@@ -47,6 +47,6 @@ def smooth_stiching(positions: Tensor, rotations: Tensor, prev_anim: dict, nfram
 
 
 if __name__ == "__main__":
-    source = "./data/zeggs/styles/old.bvh"
-    destination = "./data/zeggs/styles/old_fixed.bvh"
+    source = "./data/zeggs/styles/relaxed.bvh"
+    destination = "./data/zeggs/styles/relaxed_fixed.bvh"
     reset_pose(source, destination)

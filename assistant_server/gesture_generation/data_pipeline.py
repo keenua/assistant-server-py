@@ -99,7 +99,7 @@ def preprocess_animation(anim_data, conf=dict(), animation_path=None, info_df=No
     grot, gpos = quat.fk(lrot, lpos, anim_data["parents"])
 
     # Find root (Projected hips on the ground)
-    root_pos = gpos[:, anim_data["names"].index("Spine2")] * np.array([1, 0, 1])
+    root_pos = gpos[:, anim_data["names"].index("Hips")] * np.array([1, 0, 1])
     # root_pos = signal.savgol_filter(root_pos, 31, 3, axis=0, mode="interp")
 
     # Root direction
