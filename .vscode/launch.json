@@ -32,6 +32,13 @@
             "request": "launch",
             "module": "assistant_server.gesture_generation",
             "justMyCode": true
+        },
+        {
+            "name": "Python: Visemes Module",
+            "type": "python",
+            "request": "launch",
+            "module": "assistant_server.gesture_generation.visemes",
+            "justMyCode": true
         }
     ]
 }
