@@ -79,7 +79,6 @@ class GestureInferenceModel:
         self.results_path = Path(self.output_path) / "results"
 
         self.style_encoding_type = "label"
-        self.style = [style]
 
         # self.style_encoding_type = "example"
         # self.style = [(Path(style_path), None)]
@@ -91,7 +90,7 @@ class GestureInferenceModel:
         self.base_pos: Optional[BasePos] = None
         self.prev_anim: Optional[dict] = None
 
-    def load_style_encoding(self, temperature: float = 1.0) -> Tuple[List[Any], BasePos]:
+    def load_style_encoding(self, style: str, temperature: float = 1.0) -> Tuple[List[Any], BasePos]:
         config = self.config
 
         assert config is not None
@@ -101,103 +100,13 @@ class GestureInferenceModel:
         with torch.no_grad():
             style_encodings = []
 
-            for style in self.style:
-                if self.style_encoding_type == "example":
-                    anim_data = bvh.load(style[0])
+            style_index = config.labels.index(style)
+            # style_index = style
+            style_embeddding = torch.zeros((1, 64), dtype=torch.float32, device=device)
+            style_embeddding[0, style_index] = 1.0
+            style_encodings.append(style_embeddding)
 
-                    anim_fps = int(np.ceil(1 / anim_data["frametime"]))
-                    assert anim_fps == 60
-
-                    # Extracting features
-                    (
-                        root_pos,
-                        root_rot,
-                        root_vel,
-                        root_vrt,
-                        lpos,
-                        lrot,
-                        ltxy,
-                        lvel,
-                        lvrt,
-                        cpos,
-                        crot,
-                        ctxy,
-                        cvel,
-                        cvrt,
-                        gaze_pos,
-                        gaze_dir,
-                    ) = preprocess_animation(anim_data)
-
-                    # convert to tensor
-                    nframes = len(anim_data["rotations"])
-                    root_vel = torch.as_tensor(
-                        root_vel, dtype=torch.float32, device=device)
-                    root_vrt = torch.as_tensor(
-                        root_vrt, dtype=torch.float32, device=device)
-                    root_pos = torch.as_tensor(
-                        root_pos, dtype=torch.float32, device=device)
-                    root_rot = torch.as_tensor(
-                        root_rot, dtype=torch.float32, device=device)
-                    lpos = torch.as_tensor(
-                        lpos, dtype=torch.float32, device=device)
-                    ltxy = torch.as_tensor(
-                        ltxy, dtype=torch.float32, device=device)
-                    lvel = torch.as_tensor(
-                        lvel, dtype=torch.float32, device=device)
-                    lvrt = torch.as_tensor(
-                        lvrt, dtype=torch.float32, device=device)
-                    gaze_pos = torch.as_tensor(
-                        gaze_pos, dtype=torch.float32, device=device)
-
-                    base_pos = BasePos(
-                        root_pos=torch.nan_to_num(root_pos),
-                        root_rot=torch.nan_to_num(root_rot),
-                        root_vel=torch.nan_to_num(root_vel),
-                        root_vrt=torch.nan_to_num(root_vrt),
-                        lpos=torch.nan_to_num(lpos),
-                        ltxy=torch.nan_to_num(ltxy),
-                        lvel=torch.nan_to_num(lvel),
-                        lvrt=torch.nan_to_num(lvrt),
-                        gaze_pos=torch.nan_to_num(gaze_pos),
-                    )
-
-                    S_root_vel = root_vel.reshape(nframes, -1)
-                    S_root_vrt = root_vrt.reshape(nframes, -1)
-                    S_lpos = lpos.reshape(nframes, -1)
-                    S_ltxy = ltxy.reshape(nframes, -1)
-                    S_lvel = lvel.reshape(nframes, -1)
-                    S_lvrt = lvrt.reshape(nframes, -1)
-                    example_feature_vec = torch.cat(
-                        [
-                            S_root_vel,
-                            S_root_vrt,
-                            S_lpos,
-                            S_ltxy,
-                            S_lvel,
-                            S_lvrt,
-                            torch.zeros_like(S_root_vel),
-                        ],
-                        dim=1,
-                    )
-                    example_feature_vec = (
-                        example_feature_vec - config.anim_input_mean) / config.anim_input_std
-
-                    assert config.network_style_encoder_script is not None
-
-                    style_encoding, _, _ = config.network_style_encoder_script(
-                        example_feature_vec[np.newaxis], temperature
-                    )
-                    style_encodings.append(style_encoding)
-                elif self.style_encoding_type == "label":
-                    style_index = config.labels.index(style)
-                    # style_index = style
-                    style_embeddding = torch.zeros((1, 64), dtype=torch.float32, device=device)
-                    style_embeddding[0, style_index] = 1.0
-                    style_encodings.append(style_embeddding)
-
-                    base_pos = self.load_first_pose(self.prev_anim)
-                else:
-                    raise ValueError("Unknown style encoding type")
+            base_pos = self.load_first_pose(self.prev_anim)
 
         return (style_encodings, base_pos)
 
@@ -358,7 +267,7 @@ class GestureInferenceModel:
         )
 
     @timeit
-    def generate(self, audio_file_path: Optional[str]) -> Optional[str]:
+    def generate(self, style: str, audio_file_path: Optional[str]) -> Optional[str]:
         config = self.config
         seed = np.random.randint(0, 1000000)
         np.random.seed(seed)
@@ -366,7 +275,7 @@ class GestureInferenceModel:
 
         assert config is not None, "Model not loaded"
 
-        self.style_encoding, self.base_pos = self.load_style_encoding()
+        self.style_encoding, self.base_pos = self.load_style_encoding(style)
 
         with torch.no_grad():
             if audio_file_path is None:
@@ -408,7 +317,6 @@ class GestureInferenceModel:
 
             if self.blend_type == "stitch":
                 if len(self.style_encoding) > 1:
-                    assert len(self.style) == len(self.blend_ratio)
                     se = split_by_ratio(n_frames, self.blend_ratio)
                     V_root_pos = []
                     V_root_rot = []
@@ -534,16 +442,16 @@ class GestureInferenceModel:
         return result
 
     @timeit
-    def infer(self, audio_file_path: Optional[str], dest_path: Optional[str] = None) -> Optional[str]:
-        result_path = self.generate(audio_file_path)
+    def infer(self, style: str, audio_file_path: Optional[str], dest_path: Optional[str] = None) -> Optional[str]:
+        result_path = self.generate(style, audio_file_path)
         if result_path is None:
             return None
 
         return self.post_process(result_path, dest_path)
 
     @timeit
-    def infer_motions(self, audio_file_path: Optional[str]) -> List[str]:
-        data = self.infer(audio_file_path)
+    def infer_motions(self, style: str, audio_file_path: Optional[str]) -> List[str]:
+        data = self.infer(style, audio_file_path)
         lines = data.split("\n")
         return lines[464:-2]
 
@@ -552,5 +460,5 @@ if __name__ == "__main__":
     model = GestureInferenceModel()
 
     model.load_model()
-    model.infer("data/samples/barefoot.wav", "part1.bvh")
+    model.infer("Happy", "data/samples/barefoot.wav", "part1.bvh")
     # reset_pose("data/zeggs/styles/first_pose_neutral.bvh", "data/zeggs/styles/first_pose_neutral_fixed.bvh")

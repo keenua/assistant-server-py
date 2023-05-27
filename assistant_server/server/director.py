@@ -27,6 +27,47 @@ class Frame:
     text: Optional[str]
     viseme: Optional[str]
 
+EMOTION_TO_STYLE = {
+  "1": "Neutral",
+  "2": "Angry",
+  "3": "Angry",
+  "4": "Angry",
+  "5": "Angry",
+  "6": "Scared",
+  "7": "Angry",
+  "8": "Sad",
+  "9": "Pensive",
+  "10": "Scared",
+  "11": "Happy",
+  "12": "Sad",
+  "13": "Pensive",
+  "14": "Scared",
+  "15": "Sad",
+  "16": "Scared",
+  "17": "Sad",
+  "18": "Happy",
+  "19": "Sad",
+  "20": "Disagreement",
+  "21": "Disagreement",
+  "22": "Disagreement",
+  "23": "Disagreement",
+  "24": "Neutral",
+  "25": "Scared",
+  "26": "Scared",
+  "27": "Scared",
+  "28": "Happy",
+  "29": "Laughing",
+  "30": "Happy",
+  "31": "Laughing",
+  "32": "Sad",
+  "33": "Sad",
+  "34": "Sad",
+  "35": "Sad",
+  "36": "Neutral",
+  "37": "Happy",
+  "38": "Pensive",
+  "39": "Pensive"
+}
 
 class Director:
     def __init__(self, preferred_buffer_time: float = 2.0) -> None:
@@ -78,7 +119,9 @@ class Director:
             mp3_to_wav(audio, wav_file)
             audio_base64 = bytes_to_base64(audio)
 
-        motions = self.gesture_model.infer_motions(wav_file)
+        style = EMOTION_TO_STYLE[emotion] if emotion else "Neutral"
+
+        motions = self.gesture_model.infer_motions(style, wav_file)
         visemes = self.viseme_model.recognize(wav_file) if wav_file else []
 
         if wav_file:
