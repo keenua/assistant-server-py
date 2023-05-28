@@ -13,6 +13,11 @@ def mp3_to_wav(audio: bytes, dest_path: str) -> bytes:
     with open(dest_path, "rb") as file:
         return file.read()
 
+def mono_to_stereo(audio: bytes) -> bytes:
+    mp3 = io.BytesIO(audio)
+    sound = pydub.AudioSegment.from_mp3(mp3)
+    sound.export(mp3, format="mp3", parameters=["-ac", "2"])
+    return mp3.getvalue()
 
 def bytes_to_base64(data: bytes) -> str:
     return base64.b64encode(data).decode()

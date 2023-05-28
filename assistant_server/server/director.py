@@ -9,7 +9,7 @@ from typing import AsyncGenerator, List, Optional
 from assistant_server.api_clients.speech import generate_speech
 from assistant_server.gesture_generation.inference import GestureInferenceModel
 from assistant_server.gesture_generation.visemes import Visemes
-from assistant_server.server.utils import bytes_to_base64, mp3_to_wav
+from assistant_server.server.utils import bytes_to_base64, mono_to_stereo, mp3_to_wav
 
 
 @dataclass
@@ -117,7 +117,8 @@ class Director:
 
         if wav_file and audio:
             mp3_to_wav(audio, wav_file)
-            audio_base64 = bytes_to_base64(audio)
+            mp3_bytes = mono_to_stereo(audio)
+            audio_base64 = bytes_to_base64(mp3_bytes)
 
         style = EMOTION_TO_STYLE[emotion] if emotion else "Neutral"
 
