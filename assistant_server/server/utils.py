@@ -1,8 +1,10 @@
 import os
+from typing import List, Tuple
 import pydub
 import base64
 import io
 from elevenlabs import play
+from pydub import silence
 
 def mp3_to_wav(audio: bytes, dest_path: str) -> bytes:
     mp3 = io.BytesIO(audio)
@@ -19,6 +21,12 @@ def mono_to_stereo(audio: bytes) -> bytes:
     sound.export(mp3, format="mp3", parameters=["-ac", "2"])
     return mp3.getvalue()
 
+def get_silence(path: str) -> List[Tuple[int, int]]:
+    with open(path, "rb") as file:
+        sound = pydub.AudioSegment.from_mp3(file)
+        silences = silence.detect_silence(sound, min_silence_len=500, silence_thresh=-50)
+        return silences
+    
 def bytes_to_base64(data: bytes) -> str:
     return base64.b64encode(data).decode()
 
@@ -74,6 +82,16 @@ def print_all_emotions(dir: str):
     print(file_names)
 
 if __name__ == "__main__":
-    merge_frames("data/zeggs/styles/relaxed_fixed.bvh", "data/samples/frames/divorce_offset_3")
+    # merge_frames("data/zeggs/styles/relaxed_fixed.bvh", "data/samples/frames/divorce_offset_3")
     # visualize_logs()
     # print_all_emotions("e:\\Work\\Projects\\test_mh\\Assistant\\Content\\Animations\\Jawless")
+
+
+    # for each dir in dir
+    for dir in os.listdir("data/samples/sounds"):
+        for file in os.listdir(f"data/samples/sounds/{dir}"):
+            if file.endswith(".mp3"):
+                file_path = f"data/samples/sounds/{dir}/{file}"
+                print(file_path)
+                silences = get_silence(file_path)
+                input(silences)

@@ -39,6 +39,13 @@
             "request": "launch",
             "module": "assistant_server.gesture_generation.visemes",
             "justMyCode": true
+        },
+        {
+            "name": "Python: Speech Module",
+            "type": "python",
+            "request": "launch",
+            "module": "assistant_server.api_clients.speech",
+            "justMyCode": true
         }
     ]
 }

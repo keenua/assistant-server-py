@@ -104,9 +104,9 @@ class Director:
     def buffered(self) -> bool:
         return self.get_buffer_time() >= self.PREFFERED_BUFFER_TIME
 
-    async def __fill_audio_buffer(self, text: str, buffer: List[bytes]) -> None:
+    async def __fill_audio_buffer(self, text: str, emotion: str, buffer: List[bytes]) -> None:
         print(f"Generating audio for: {text}")
-        async for audio in generate_speech(text):
+        async for audio in generate_speech(text, emotion):
             buffer.append(audio)
             print("Adding chunk to buffer (%d)" % len(buffer))
 
@@ -182,7 +182,7 @@ class Director:
 
             if self.statement_queue and task_empty:
                 statement = self.statement_queue.pop(0)
-                fill_buffer_task = asyncio.create_task(self.__fill_audio_buffer(statement.text, buffer))
+                fill_buffer_task = asyncio.create_task(self.__fill_audio_buffer(statement.text, statement.emotion, buffer))
 
             if buffer and statement:
                 print("Popping chunk from buffer (%d)" % len(buffer))
