@@ -71,7 +71,7 @@ def split_by_silence(audio: bytes) -> Optional[bytes]:
     sound[mid:].export(mp3, format="mp3")
     return mp3.getvalue()
 
-async def generate_speech_with_prefix(text: str, emotion: str, chunk_size: int = 8000 * 2, voice_id: str = "21m00Tcm4TlvDq8ikWAM", stability: float = 0.35, similarity: float = 0.7) -> AsyncGenerator[bytes, None]:
+async def generate_speech_with_prefix(text: str, emotion: str, voice_id: str = "21m00Tcm4TlvDq8ikWAM", stability: float = 0.35, similarity: float = 0.7) -> AsyncGenerator[bytes, None]:
     prefix = EMOTION_MAPPING.get(emotion) or ""
     text = f"{prefix}:\n\"...\"\n\"{text}\""
 
@@ -84,50 +84,28 @@ async def generate_speech_with_prefix(text: str, emotion: str, chunk_size: int =
     }
 
     async with aiohttp.ClientSession() as session:
-        async with session.post(f"https://api.elevenlabs.io/v1/text-to-speech/{voice_id}/stream", json=body, headers={"xi-api-key": API_KEY}) as resp:
+        async with session.post(f"https://api.elevenlabs.io/v1/text-to-speech/{voice_id}/stream?optimize_streaming_latency=3", json=body, headers={"xi-api-key": API_KEY}) as resp:
             async for data in resp.content.iter_any():
                 if data:
                     yield data
 
 async def generate_speech(text: str, emotion: str, chunk_size: int = 8000 * 2, voice_id: str = "21m00Tcm4TlvDq8ikWAM", stability: float = 0.35, similarity: float = 0.7) -> AsyncGenerator[bytes, None]:
     buffer: List[bytes] = []
-    buffer_size = 0
 
-    prefix_processed = False
-
-    async for audio in generate_speech_with_prefix(text, emotion, chunk_size, voice_id, stability, similarity):
+    async for audio in generate_speech_with_prefix(text, emotion, voice_id, stability, similarity):
         buffer.append(audio)
-        buffer_size += len(audio)
-
-        if (prefix_processed):
-            if buffer_size >= chunk_size * 2:
-                chunk = buffer.pop(0)
-
-                size = len(chunk)
-                while size < chunk_size:
-                    chunk += buffer.pop(0)
-                    size += len(chunk)
-
-                buffer_size -= len(chunk)
-                print("yielding chunk (%d)" % len(chunk))
-                yield chunk
-        else:
-            split_audio = split_by_silence(b"".join(buffer))
-            if (split_audio is not None):
-                buffer = [split_audio]
-                buffer_size = len(split_audio)
-                prefix_processed = True
-        
-    if buffer:
-        chunk = b"".join(buffer)
-        print("yielding last chunk (%d)" % len(chunk))
-        yield chunk
+    audio = b"".join(buffer)
+    result = split_by_silence(audio)
+    if result:
+        yield result
+    else:
+        yield audio
 
 
 if __name__ == "__main__":
     async def main():
         buffer = BytesIO()
-        async for audio in generate_speech("This is the funniest thing I've ever heard. You should go do standup.", "29"):
+        async for audio in generate_speech("I've been replaying that moment in my head, over and over again. The moment I found out the truth, the truth about you, and the truth about us.", "15"):
             buffer.write(audio)
         
         buffer.seek(0)
