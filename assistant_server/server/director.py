@@ -121,8 +121,9 @@ class Director:
             sound = mp3_to_wav(audio, wav_file)
             audio_base64 = bytes_to_base64(sound)
         else:
-            silence = AudioSegment.silent(duration=3000, frame_rate=16000)
-            silence.export(wav_file, format="wav", parameters=["-ar", "16000"])
+            silence = AudioSegment.silent(duration=4000, frame_rate=16000)
+            silence = silence.set_channels(1)
+            silence.export(wav_file, format="wav", parameters=["-ar", "16000", "-ac", "1"])
 
         style = EMOTION_TO_STYLE[emotion] if emotion else "Neutral"
 

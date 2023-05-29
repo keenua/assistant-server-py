@@ -94,7 +94,7 @@ def write_bvh(
     rotations = np.degrees(quat.to_euler(orig_V_lrot, order=order))
 
     if prev_anim is not None:
-        positions, rotations = smooth_stiching(positions, rotations, prev_anim)
+        positions, rotations = smooth_stiching(positions, rotations, prev_anim, 60)
 
     bvh_data = dict(
         order=order,
