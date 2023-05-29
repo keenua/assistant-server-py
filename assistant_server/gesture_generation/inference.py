@@ -278,36 +278,31 @@ class GestureInferenceModel:
         self.style_encoding, self.base_pos = self.load_style_encoding(style)
 
         with torch.no_grad():
-            if audio_file_path is None:
-                audio_features = torch.zeros(
-                    (242, 81), device=config.device, dtype=torch.float32
-                )
-            else:
-                # Load Audio
-                _, audio_data = read_wavfile(
-                    audio_file_path,
-                    rescale=True,
-                    desired_fs=16000,
-                    desired_nb_channels=None,
-                    out_type="float32",
-                    logger=None,
-                )
+            # Load Audio
+            _, audio_data = read_wavfile(
+                audio_file_path,
+                rescale=True,
+                desired_fs=16000,
+                desired_nb_channels=None,
+                out_type="float32",
+                logger=None,
+            )
 
-                n_frames = int(round(60.0 * (len(audio_data) / 16000)))
+            n_frames = int(round(60.0 * (len(audio_data) / 16000)))
 
-                audio_features = torch.as_tensor(
-                    preprocess_audio(
-                        audio_data,
-                        60,
-                        n_frames,
-                        config.data_pipeline_conf.audio_conf,
-                        feature_type=config.data_pipeline_conf.audio_feature_type,
-                    ),
-                    device=config.device,
-                    dtype=torch.float32,
-                )
+            audio_features = torch.as_tensor(
+                preprocess_audio(
+                    audio_data,
+                    60,
+                    n_frames,
+                    config.data_pipeline_conf.audio_conf,
+                    feature_type=config.data_pipeline_conf.audio_feature_type,
+                ),
+                device=config.device,
+                dtype=torch.float32,
+            )
 
-                audio_features = torch.nan_to_num(audio_features)
+            audio_features = torch.nan_to_num(audio_features)
 
             speech_encoding = config.network_speech_encoder_script(
                 (audio_features[np.newaxis] -

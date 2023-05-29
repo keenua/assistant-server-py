@@ -4,7 +4,9 @@ import os
 
 from dataclasses import dataclass
 from time import time
+from uuid import uuid4
 from typing import AsyncGenerator, List, Optional
+from pydub import AudioSegment
 
 from assistant_server.api_clients.speech import generate_speech
 from assistant_server.gesture_generation.inference import GestureInferenceModel
@@ -112,18 +114,20 @@ class Director:
 
     def __generate_from_audio(self, audio: Optional[bytes], emotion: Optional[str], text: Optional[str]) -> List[Frame]:
         start_frame_index = self.frame_index
-        wav_file = "temp.wav" if audio else None
+        wav_file = f"{uuid4()}.wav"
         audio_base64: Optional[str] = None
 
-        if wav_file and audio:
-            mp3_to_wav(audio, wav_file)
-            mp3_bytes = mono_to_stereo(audio)
-            audio_base64 = bytes_to_base64(mp3_bytes)
+        if audio:
+            sound = mp3_to_wav(audio, wav_file)
+            audio_base64 = bytes_to_base64(sound)
+        else:
+            silence = AudioSegment.silent(duration=3000, frame_rate=16000)
+            silence.export(wav_file, format="wav", parameters=["-ar", "16000"])
 
         style = EMOTION_TO_STYLE[emotion] if emotion else "Neutral"
 
         motions = self.gesture_model.infer_motions(style, wav_file)
-        visemes = self.viseme_model.recognize(wav_file) if wav_file else []
+        visemes = self.viseme_model.recognize(wav_file) if audio else []
 
         if wav_file:
             os.remove(wav_file)

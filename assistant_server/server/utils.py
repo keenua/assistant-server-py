@@ -6,14 +6,22 @@ import io
 from elevenlabs import play
 from pydub import silence
 
-def mp3_to_wav(audio: bytes, dest_path: str) -> bytes:
-    mp3 = io.BytesIO(audio)
-    sound = pydub.AudioSegment.from_mp3(mp3)
-    sound = sound.set_frame_rate(16000)
-    sound.export(dest_path, format="wav")
+FRAME_RATE = 16000
 
-    with open(dest_path, "rb") as file:
-        return file.read()
+def mp3_to_wav(audio: bytes, dest_path: str, pad_ms = 1000) -> bytes:
+    mp3 = io.BytesIO(audio)
+    sound: pydub.AudioSegment = pydub.AudioSegment.from_mp3(mp3)
+    # sound = sound.set_frame_rate(FRAME_RATE)
+    # sound = sound.set_channels(2)
+    
+    silence = pydub.AudioSegment.silent(duration=pad_ms-len(sound)+1, frame_rate=FRAME_RATE)
+    # silence = silence.set_channels(2)
+    sound = sound + silence
+
+    sound.export(dest_path, format="wav", parameters=["-ar", "16000"])
+    
+    sound.export(mp3, format="mp3", parameters=["-ac", "2", "-ar", "44100"])
+    return mp3.getvalue()
 
 def mono_to_stereo(audio: bytes) -> bytes:
     mp3 = io.BytesIO(audio)

@@ -86,7 +86,8 @@ async def generate_speech_with_prefix(text: str, emotion: str, chunk_size: int =
     async with aiohttp.ClientSession() as session:
         async with session.post(f"https://api.elevenlabs.io/v1/text-to-speech/{voice_id}/stream", json=body, headers={"xi-api-key": API_KEY}) as resp:
             async for data in resp.content.iter_any():
-                yield data
+                if data:
+                    yield data
 
 async def generate_speech(text: str, emotion: str, chunk_size: int = 8000 * 2, voice_id: str = "21m00Tcm4TlvDq8ikWAM", stability: float = 0.35, similarity: float = 0.7) -> AsyncGenerator[bytes, None]:
     buffer: List[bytes] = []

@@ -76,7 +76,7 @@ async def handle_connection(websocket: WebSocketServerProtocol, path: str) -> No
 
     director = Director()
     director.start(frames_dir if FRAMES_FROM_FILE else None)
-    
+
     async def process_frames(frames: List[Frame]):
         global frame_package_index
 
@@ -116,7 +116,7 @@ async def handle_connection(websocket: WebSocketServerProtocol, path: str) -> No
 
         if heartbeat_task:
             heartbeat_task.add_done_callback(
-                lambda _: handle_messages_task and handle_messages_task.cancel())
+                lambda _: (handle_messages_task and handle_messages_task.cancel(), print("Heartbeat task done")))
 
         print("Waiting for messages")
 
@@ -154,7 +154,8 @@ if __name__ == "__main__":
         director = Director()
         director.start()
 
-        send_frames_task = asyncio.ensure_future(send_frames(director, log_frames))
+        send_frames_task = asyncio.ensure_future(
+            send_frames(director, log_frames))
 
         await process_prompt(text, director)
 
