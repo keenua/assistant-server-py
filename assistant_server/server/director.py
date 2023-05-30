@@ -1,4 +1,5 @@
 import asyncio
+from io import BytesIO
 import json
 import os
 
@@ -11,7 +12,7 @@ from pydub import AudioSegment
 from assistant_server.api_clients.speech import generate_speech
 from assistant_server.gesture_generation.inference import GestureInferenceModel
 from assistant_server.gesture_generation.visemes import Visemes
-from assistant_server.server.utils import bytes_to_base64, mono_to_stereo, mp3_to_wav
+from assistant_server.server.utils import bytes_to_base64, correct_length, export_mp3, export_ogg, mono_to_stereo, mp3_to_wav
 
 
 @dataclass
@@ -90,6 +91,11 @@ class Director:
         self.processing = False
 
         self.run_task: Optional[asyncio.Task] = None
+        
+        silence = AudioSegment.silent(duration=4000, frame_rate=44100)
+        mp3 = BytesIO()
+        silence.export(mp3, format="mp3", parameters=["-ac", "1", "-ar", "44100"])
+        self.silence = mp3.getvalue()
 
     def add_statement(self, statement: StatementData) -> None:
         print(f"Statement added: {statement.text}")
@@ -117,14 +123,11 @@ class Director:
         wav_file = f"{uuid4()}.wav"
         audio_base64: Optional[str] = None
 
-        if audio:
-            sound = mp3_to_wav(audio, wav_file)
-            audio_base64 = bytes_to_base64(sound)
-        else:
-            silence = AudioSegment.silent(duration=4000, frame_rate=16000)
-            silence = silence.set_channels(1)
-            silence.export(wav_file, format="wav", parameters=["-ar", "16000", "-ac", "1"])
+        if not audio:
+            audio = self.silence
 
+        sound = mp3_to_wav(audio, wav_file)
+        
         style = EMOTION_TO_STYLE[emotion] if emotion else "Neutral"
 
         motions = self.gesture_model.infer_motions(style, wav_file)
@@ -138,6 +141,9 @@ class Director:
         viseme_end = 0
         last_viseme_was_silence = True
         offset = 0.1
+
+        total_duration = len(motions) / float(self.FPS)
+        first_frame = True
 
         for motion in motions:
             timestamp = (self.frame_index - start_frame_index) / float(self.FPS)
@@ -154,6 +160,13 @@ class Director:
                 viseme_str = "sil"
                 last_viseme_was_silence = True
 
+            if first_frame:
+                sound = correct_length(sound, int(total_duration*1000))
+                sound_bytes = export_ogg(sound)
+                audio_base64 = bytes_to_base64(sound_bytes)
+            else:
+                audio_base64 = None
+
             frame = Frame(
                 index=self.frame_index,
                 motion=motion.strip(),
@@ -167,6 +180,7 @@ class Director:
             self.frame_index += 1
 
             # Only send audio and text on the first frame
+            first_frame = False
             audio_base64 = None
             text = None
             emotion = None
