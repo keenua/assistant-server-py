@@ -113,7 +113,9 @@ class Director:
     async def __fill_audio_buffer(self, text: str, emotion: str, buffer: AudioBuffer) -> None:
         print(f"Generating audio for: {text}")
         async for audio in generate_speech(text, emotion):
-            buffer.append(audio)
+            await buffer.append(audio)
+
+        await buffer.flush()
 
     def __generate_from_audio(self, available: bool, audio: AudioSegment, emotion: Optional[str], text: Optional[str]) -> List[Frame]:
         start_frame_index = self.frame_index
@@ -205,8 +207,8 @@ class Director:
                 statement = self.statement_queue.pop(0)
                 fill_buffer_task = asyncio.create_task(self.__fill_audio_buffer(statement.text, statement.emotion, buffer))
 
-            if (buffer.sound_available() and statement) or not self.buffered():
-                available, audio = buffer.pop()
+            if (await buffer.sound_available() and statement) or not self.buffered():
+                available, audio = await buffer.pop()
                 emotion = statement.emotion if statement else None
                 text = statement.text if statement else None
                 frames = self.__generate_from_audio(available, audio, emotion, text)
@@ -214,7 +216,7 @@ class Director:
             for frame in frames:
                 yield frame
 
-            self.processing = not task_empty or buffer.sound_available()
+            self.processing = not task_empty or await buffer.sound_available()
 
             # print(f"Buffer: {self.get_buffer_time()}")
             await asyncio.sleep(0.1)

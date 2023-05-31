@@ -56,22 +56,7 @@ EMOTION_MAPPING = {
     "39": "She gasped shocked"
 }
 
-def split_by_silence(audio: bytes) -> Optional[bytes]:
-    mp3 = BytesIO(audio)
-    sound = AudioSegment.from_mp3(mp3)
-    silences = silence.detect_silence(sound, min_silence_len=300, silence_thresh=-50)
-
-    if (len(silences) == 0):
-        return None
-
-    start, end = silences[0]
-    mid = start + (end - start) * 3 // 4 
-
-    mp3 = BytesIO()
-    sound[mid:].export(mp3, format="mp3")
-    return mp3.getvalue()
-
-async def generate_speech_with_prefix(text: str, emotion: str, chunk_size: int = 8000 * 2, voice_id: str = "21m00Tcm4TlvDq8ikWAM", stability: float = 0.35, similarity: float = 0.7) -> AsyncGenerator[bytes, None]:
+async def generate_speech(text: str, emotion: str, voice_id: str = "21m00Tcm4TlvDq8ikWAM", stability: float = 0.35, similarity: float = 0.7) -> AsyncGenerator[bytes, None]:
     prefix = EMOTION_MAPPING.get(emotion) or ""
     text = f"{prefix}:\n\"...\"\n\"{text}\""
 
@@ -89,46 +74,13 @@ async def generate_speech_with_prefix(text: str, emotion: str, chunk_size: int =
                 if data:
                     yield data
 
-async def generate_speech(text: str, emotion: str, chunk_size: int = 8000, voice_id: str = "21m00Tcm4TlvDq8ikWAM", stability: float = 0.35, similarity: float = 0.7) -> AsyncGenerator[AudioSegment, None]:
-    buffer: List[bytes] = []
-    buffer_size = 0
-
-    prefix_processed = False
-
-    async for audio in generate_speech_with_prefix(text, emotion, chunk_size, voice_id, stability, similarity):
-        buffer.append(audio)
-        buffer_size += len(audio)
-
-        if (prefix_processed):
-            if buffer_size >= chunk_size * 2:
-                chunk = buffer.pop(0)
-
-                size = len(chunk)
-                while size < chunk_size:
-                    chunk += buffer.pop(0)
-                    size += len(chunk)
-
-                buffer_size -= len(chunk)
-                print("yielding chunk (%d)" % len(chunk))
-                mp3 = BytesIO(chunk)
-                yield AudioSegment.from_mp3(mp3)
-        else:
-            split_audio = split_by_silence(b"".join(buffer))
-            if (split_audio is not None):
-                buffer = [split_audio]
-                buffer_size = len(split_audio)
-                prefix_processed = True
-        
-    if buffer:
-        chunk = b"".join(buffer)
-        print("yielding last chunk (%d)" % len(chunk))
-        mp3 = BytesIO(chunk)
-        yield AudioSegment.from_mp3(mp3)
-
 
 if __name__ == "__main__":
     async def main():
+        buffer: List[bytes] = []
         async for audio in generate_speech("I've been replaying that moment in my head, over and over again. The moment I found out the truth, the truth about you, and the truth about us.", "15"):
-            play(audio)
+            buffer.append(audio)
+        
+        play(AudioSegment.from_mp3(BytesIO(b"".join(buffer))))
 
     asyncio.run(main())

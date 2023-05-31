@@ -16,6 +16,10 @@ def export_wav(audio: pydub.AudioSegment) -> bytes:
 def save_wav(audio: pydub.AudioSegment, path: str):
     audio.export(path, format="wav", parameters=["-ar", "16000"])
 
+def import_mp3(audio: bytes) -> pydub.AudioSegment:
+    mp3 = io.BytesIO(audio)
+    return pydub.AudioSegment.from_mp3(mp3)
+
 def export_mp3(audio: pydub.AudioSegment) -> bytes:
     mp3 = io.BytesIO()
     audio.export(mp3, format="mp3", parameters=["-ac", "2", "-ar", "44100"])
