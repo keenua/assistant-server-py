@@ -131,6 +131,9 @@ class Director:
 
         frames_shift = int(self.sound_duration_ms / 1000 * self.FPS) - self.frames_played
 
+        if frames_shift != 0:
+            print(f"Frame shift {frames_shift}")
+
         if frames_shift > 0:
             # repeat first frame
             for _ in range(frames_shift):
