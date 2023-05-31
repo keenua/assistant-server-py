@@ -5,8 +5,8 @@ from typing import AsyncGenerator, List, Optional
 import aiohttp
 
 from dotenv import load_dotenv
-from elevenlabs import play
 from pydub import silence, AudioSegment
+from pydub.playback import play
 
 load_dotenv()
 
@@ -89,7 +89,7 @@ async def generate_speech_with_prefix(text: str, emotion: str, chunk_size: int =
                 if data:
                     yield data
 
-async def generate_speech(text: str, emotion: str, chunk_size: int = 8000, voice_id: str = "21m00Tcm4TlvDq8ikWAM", stability: float = 0.35, similarity: float = 0.7) -> AsyncGenerator[bytes, None]:
+async def generate_speech(text: str, emotion: str, chunk_size: int = 8000, voice_id: str = "21m00Tcm4TlvDq8ikWAM", stability: float = 0.35, similarity: float = 0.7) -> AsyncGenerator[AudioSegment, None]:
     buffer: List[bytes] = []
     buffer_size = 0
 
@@ -110,7 +110,8 @@ async def generate_speech(text: str, emotion: str, chunk_size: int = 8000, voice
 
                 buffer_size -= len(chunk)
                 print("yielding chunk (%d)" % len(chunk))
-                yield chunk
+                mp3 = BytesIO(chunk)
+                yield AudioSegment.from_mp3(mp3)
         else:
             split_audio = split_by_silence(b"".join(buffer))
             if (split_audio is not None):
@@ -121,16 +122,13 @@ async def generate_speech(text: str, emotion: str, chunk_size: int = 8000, voice
     if buffer:
         chunk = b"".join(buffer)
         print("yielding last chunk (%d)" % len(chunk))
-        yield chunk
+        mp3 = BytesIO(chunk)
+        yield AudioSegment.from_mp3(mp3)
 
 
 if __name__ == "__main__":
     async def main():
-        buffer = BytesIO()
         async for audio in generate_speech("I've been replaying that moment in my head, over and over again. The moment I found out the truth, the truth about you, and the truth about us.", "15"):
-            buffer.write(audio)
-        
-        buffer.seek(0)
-        play(buffer.getvalue())
+            play(audio)
 
     asyncio.run(main())

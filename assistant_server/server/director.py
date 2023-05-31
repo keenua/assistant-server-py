@@ -12,7 +12,8 @@ from pydub import AudioSegment
 from assistant_server.api_clients.speech import generate_speech
 from assistant_server.gesture_generation.inference import GestureInferenceModel
 from assistant_server.gesture_generation.visemes import Visemes
-from assistant_server.server.utils import bytes_to_base64, correct_length, export_mp3, export_ogg, mono_to_stereo, mp3_to_wav
+from assistant_server.server.audio import AudioBuffer
+from assistant_server.server.utils import bytes_to_base64, export_flac, save_wav
 
 
 @dataclass
@@ -89,13 +90,10 @@ class Director:
 
         self.frame_buffer: List[Frame] = []
         self.processing = False
+        self.sound_duration_ms = 0
+        self.frames_played = 0
 
         self.run_task: Optional[asyncio.Task] = None
-        
-        silence = AudioSegment.silent(duration=4000, frame_rate=44100)
-        mp3 = BytesIO()
-        silence.export(mp3, format="mp3", parameters=["-ac", "1", "-ar", "44100"])
-        self.silence = mp3.getvalue()
 
     def add_statement(self, statement: StatementData) -> None:
         print(f"Statement added: {statement.text}")
@@ -112,26 +110,32 @@ class Director:
     def buffered(self) -> bool:
         return self.get_buffer_time() >= self.PREFFERED_BUFFER_TIME
 
-    async def __fill_audio_buffer(self, text: str, emotion: str, buffer: List[bytes]) -> None:
+    async def __fill_audio_buffer(self, text: str, emotion: str, buffer: AudioBuffer) -> None:
         print(f"Generating audio for: {text}")
         async for audio in generate_speech(text, emotion):
             buffer.append(audio)
-            print("Adding chunk to buffer (%d)" % len(buffer))
 
-    def __generate_from_audio(self, audio: Optional[bytes], emotion: Optional[str], text: Optional[str]) -> List[Frame]:
+    def __generate_from_audio(self, available: bool, audio: AudioSegment, emotion: Optional[str], text: Optional[str]) -> List[Frame]:
         start_frame_index = self.frame_index
         wav_file = f"{uuid4()}.wav"
         audio_base64: Optional[str] = None
 
-        if not audio:
-            audio = self.silence
-
-        sound = mp3_to_wav(audio, wav_file)
+        save_wav(audio, wav_file)
+        
+        visemes = self.viseme_model.recognize(wav_file) if available else []
         
         style = EMOTION_TO_STYLE[emotion] if emotion else "Neutral"
-
         motions = self.gesture_model.infer_motions(style, wav_file)
-        visemes = self.viseme_model.recognize(wav_file) if audio else []
+
+        frames_shift = int(self.sound_duration_ms / 1000 * self.FPS) - self.frames_played
+
+        if frames_shift > 0:
+            # repeat first frame
+            for _ in range(frames_shift):
+                motions.insert(0, motions[0])
+        elif frames_shift < 0:
+            # remove first frames
+            motions = motions[-frames_shift:]
 
         if wav_file:
             os.remove(wav_file)
@@ -142,7 +146,6 @@ class Director:
         last_viseme_was_silence = True
         offset = 0.1
 
-        total_duration = len(motions) / float(self.FPS)
         first_frame = True
 
         for motion in motions:
@@ -161,9 +164,9 @@ class Director:
                 last_viseme_was_silence = True
 
             if first_frame:
-                sound = correct_length(sound, int(total_duration*1000))
-                sound_bytes = export_ogg(sound)
+                sound_bytes = export_flac(audio)
                 audio_base64 = bytes_to_base64(sound_bytes)
+                self.sound_duration_ms += len(audio)
             else:
                 audio_base64 = None
 
@@ -185,13 +188,12 @@ class Director:
             text = None
             emotion = None
 
+            self.frames_played += 1
+
         return result
 
-    def __generate_silence(self) -> List[Frame]:
-        return self.__generate_from_audio(None, None, "")
-
     async def __generate_frames(self) -> AsyncGenerator[Frame, None]:
-        buffer: List[bytes] = []
+        buffer = AudioBuffer()
         fill_buffer_task: Optional[asyncio.Task] = None
         statement: Optional[StatementData] = None
 
@@ -203,20 +205,16 @@ class Director:
                 statement = self.statement_queue.pop(0)
                 fill_buffer_task = asyncio.create_task(self.__fill_audio_buffer(statement.text, statement.emotion, buffer))
 
-            if buffer and statement:
-                print("Popping chunk from buffer (%d)" % len(buffer))
-                audio = buffer.pop(0)
-                print("Generating from audio (%d)" % len(audio))
-                frames = self.__generate_from_audio(audio, statement.emotion, statement.text)
-                print("Generated from audio (%d)" % len(audio))
-            elif not self.buffered():
-                frames = self.__generate_silence()
-                # frames = []
+            if (buffer.sound_available() and statement) or not self.buffered():
+                available, audio = buffer.pop()
+                emotion = statement.emotion if statement else None
+                text = statement.text if statement else None
+                frames = self.__generate_from_audio(available, audio, emotion, text)
 
             for frame in frames:
                 yield frame
 
-            self.processing = not task_empty or bool(buffer)
+            self.processing = not task_empty or buffer.sound_available()
 
             # print(f"Buffer: {self.get_buffer_time()}")
             await asyncio.sleep(0.1)

@@ -8,13 +8,13 @@ from pydub import silence
 
 FRAME_RATE = 16000
 
-def mp3_to_wav(audio: bytes, dest_path: str, pad_ms = 1000) -> pydub.AudioSegment:
-    mp3 = io.BytesIO(audio)
-    sound: pydub.AudioSegment = pydub.AudioSegment.from_mp3(mp3)
+def export_wav(audio: pydub.AudioSegment) -> bytes:
+    mp3 = io.BytesIO()
+    audio.export(mp3, format="wav", parameters=["-ar", "16000"])
+    return mp3.getvalue()
 
-    sound = pad_with_silence(sound, pad_ms)
-    sound.export(dest_path, format="wav", parameters=["-ar", "16000"])
-    return sound
+def save_wav(audio: pydub.AudioSegment, path: str):
+    audio.export(path, format="wav", parameters=["-ar", "16000"])
 
 def export_mp3(audio: pydub.AudioSegment) -> bytes:
     mp3 = io.BytesIO()
@@ -26,15 +26,14 @@ def export_ogg(audio: pydub.AudioSegment) -> bytes:
     audio.export(mp3, format="ogg", parameters=["-ac", "2", "-ar", "44100"])
     return mp3.getvalue()
 
+def export_flac(audio: pydub.AudioSegment) -> bytes:
+    mp3 = io.BytesIO()
+    audio.export(mp3, format="flac", parameters=["-ac", "2", "-ar", "44100"])
+    return mp3.getvalue()
+
 def pad_with_silence(audio: pydub.AudioSegment, pad_ms: int) -> pydub.AudioSegment:
     silence = pydub.AudioSegment.silent(duration=pad_ms-len(audio)+1, frame_rate=FRAME_RATE)
     return audio + silence
-
-def correct_length(audio: pydub.AudioSegment, ms: int) -> pydub.AudioSegment:
-    if len(audio) < ms:
-        return pad_with_silence(audio, ms)
-    else:
-        return audio[:ms]
 
 def mono_to_stereo(audio: bytes) -> bytes:
     mp3 = io.BytesIO(audio)
