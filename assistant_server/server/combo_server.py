@@ -85,9 +85,9 @@ async def handle_connection(websocket: WebSocketServerProtocol, path: str) -> No
             "frames": [frame.__dict__ for frame in frames]
         }
 
-        with open(f"{current_dir}/../../data/results/frames/temp{frame_package_index}.json", "w") as file:
-            data = [frame.__dict__ for frame in frames]
-            json.dump(data, file)
+        # with open(f"{current_dir}/../../data/results/frames/temp{frame_package_index}.json", "w") as file:
+        #     data = [frame.__dict__ for frame in frames]
+        #     json.dump(data, file)
         frame_package_index += 1
         try:
             await websocket.send(json.dumps(result))
