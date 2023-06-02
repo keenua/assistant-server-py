@@ -1,11 +1,40 @@
 import time
 from functools import wraps
+import sys
+import logging
 
 import numpy as np
 from scipy import interpolate
 
 from assistant_server.gesture_generation.anim import bvh, quat
 from assistant_server.gesture_generation.postprocessing import smooth_stiching
+
+
+def setup_logging():
+    # Create logger
+    logger = logging.getLogger()
+    logger.setLevel(logging.DEBUG)
+
+    # Create console handler
+    console_handler = logging.StreamHandler(sys.stdout)
+    console_handler.setLevel(logging.DEBUG)
+
+    # Create file handler
+    file_handler = logging.FileHandler('app.log')
+    file_handler.setLevel(logging.DEBUG)
+
+    # Create formatter
+    formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+
+    # Add formatter to handlers
+    console_handler.setFormatter(formatter)
+    file_handler.setFormatter(formatter)
+
+    # Add handlers to logger
+    logger.addHandler(console_handler)
+    logger.addHandler(file_handler)
+
+    return logger
 
 
 def change_bvh(filename, savename, order=None, fps=None, pace=1.0, center=False):
@@ -112,13 +141,18 @@ def write_bvh(
 
 
 def timeit(func):
+    logger = logging.getLogger(__name__)
+
     @wraps(func)
     def timeit_wrapper(*args, **kwargs):
         start_time = time.perf_counter()
         result = func(*args, **kwargs)
         end_time = time.perf_counter()
         total_time = end_time - start_time
-        print(
+        logger.info(
             f'Function {func.__name__}{args} {kwargs} Took {total_time:.4f} seconds')
         return result
     return timeit_wrapper
+
+
+setup_logging()
