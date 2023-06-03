@@ -32,7 +32,6 @@ def reset_pose(source: str, destination: str):
     bvhio.writeHierarchy(path=destination, root=root, frameTime=1/60)
 
 
-@timeit
 def smooth_stiching(positions: Tensor, rotations: Tensor, prev_anim: dict, nframes: int = 30) -> Tuple[Tensor, Tensor]:
     if prev_anim is None:
         return positions, rotations
