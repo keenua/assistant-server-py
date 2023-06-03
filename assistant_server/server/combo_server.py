@@ -20,6 +20,7 @@ LOGGER = logging.getLogger(__name__)
 FRAMES_FROM_FILE = False
 
 async def process_prompt(prompt: str, director: Director) -> None:
+    # director.add_statement(StatementData("I got it, let me think for a second", ""))
     async for statement in gpt(prompt):
         if isinstance(statement, SayStatement):
             statement_data = StatementData(statement.text, statement.emotion)

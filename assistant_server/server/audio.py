@@ -61,6 +61,7 @@ class AudioBuffer:
             self.logger.info(f"Returning silence of size {len(self.silence)} ms")
             return False, self.silence
         
+    @timeit
     def detect_silence(self) -> int:
         silences = silence.detect_silence(self.sound, min_silence_len=300, silence_thresh=-50)
 

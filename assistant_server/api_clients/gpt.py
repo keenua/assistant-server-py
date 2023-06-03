@@ -145,7 +145,7 @@ async def gpt(user_prompt: str) -> AsyncGenerator[Statement, None]:
     LOGGER.info(f"Asking GPT-4 for {user_prompt}")
     statement_transformer = StatementTransformer()
 
-    async for data in stream(user_prompt, system_prompt, "gpt-4"):
+    async for data in stream(user_prompt, system_prompt, "gpt-3.5-turbo"):
         chunk = json.loads(data)
 
         statements = statement_transformer.transform(chunk)

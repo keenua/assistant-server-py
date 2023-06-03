@@ -3,14 +3,18 @@ from io import BytesIO
 from os import getenv
 from typing import AsyncGenerator, List, Optional
 import aiohttp
+import logging
 
 from dotenv import load_dotenv
 from pydub import silence, AudioSegment
 from pydub.playback import play
 
+from assistant_server.utils.common import timeit
+
 load_dotenv()
 
 API_KEY = getenv("ELEVENLABS_API_KEY")
+LOGGER = logging.getLogger(__name__)
 
 EMOTION_MAPPING = {
     "": "She said",
@@ -56,7 +60,10 @@ EMOTION_MAPPING = {
     "39": "She gasped shocked"
 }
 
+@timeit
 async def generate_speech(text: str, emotion: str, voice_id: str = "21m00Tcm4TlvDq8ikWAM", stability: float = 0.35, similarity: float = 0.7) -> AsyncGenerator[bytes, None]:
+    LOGGER.info(f"Generating speech for \"{text}\"")
+
     prefix = EMOTION_MAPPING.get(emotion) or ""
     text = f"{prefix}:\n\"...\"\n\"{text}\""
 
@@ -68,10 +75,15 @@ async def generate_speech(text: str, emotion: str, voice_id: str = "21m00Tcm4Tlv
         }
     }
 
+    first_chunk_sent = False
+
     async with aiohttp.ClientSession() as session:
-        async with session.post(f"https://api.elevenlabs.io/v1/text-to-speech/{voice_id}/stream", json=body, headers={"xi-api-key": API_KEY}) as resp:
+        async with session.post(f"https://api.elevenlabs.io/v1/text-to-speech/{voice_id}/stream?optimize_streaming_latency=4", json=body, headers={"xi-api-key": API_KEY}) as resp:
             async for data in resp.content.iter_any():
                 if data:
+                    if not first_chunk_sent:
+                        LOGGER.info(f"First chunk sent for \"{text}\"")
+                    first_chunk_sent = True
                     yield data
 
 

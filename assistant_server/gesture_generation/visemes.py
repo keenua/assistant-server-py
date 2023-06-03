@@ -1,3 +1,4 @@
+from argparse import Namespace
 from dataclasses import dataclass
 import os
 from pathlib import Path
@@ -174,7 +175,7 @@ class Visemes():
         self.model_name = model_name
         self.lang = lang
         self.update_phone()
-        self.recognizer = read_recognizer(self.model_name)
+        self.recognizer = read_recognizer(Namespace(model=model_name, device_id=0, lang='ipa', approximate=False, prior=None))
 
     def parse_frames(self, phones: str) -> List[Frame]:
         frames = []
