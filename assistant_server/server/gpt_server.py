@@ -1,8 +1,12 @@
 import asyncio
 import json
-from websockets.server import serve, WebSocketServerProtocol
-from assistant_server.api_clients.gpt import gpt, SayStatement
+import logging
 
+from websockets.server import WebSocketServerProtocol, serve
+
+from assistant_server.api_clients.gpt import SayStatement, gpt
+
+LOGGER = logging.getLogger(__name__)
 
 async def read_file(file_path: str) -> str:
     with open(file_path, "r") as file:
@@ -23,25 +27,25 @@ async def repeat(prompt: str, websocket: WebSocketServerProtocol) -> None:
 
 
 async def handle_connection(websocket: WebSocketServerProtocol, path: str) -> None:
-    print("Client connected")
+    LOGGER.info("Client connected")
 
     try:
         async for message in websocket:
             message_str = message.decode("utf-8") if isinstance(message, bytes) else message
-            print(f"Received message: {message_str}")
+            LOGGER.info(f"Received message: {message_str}")
             await repeat(message_str, websocket)
-            print("GPT done")
+            LOGGER.info("GPT done")
 
     except Exception as error:
-        print(f"GPT error: {error}")
+        LOGGER.error(f"GPT error: {error}")
 
     finally:
-        print("Client disconnected")
+        LOGGER.info("Client disconnected")
 
 
 async def start():
     port = 3000
-    print(f"WebSocket server is running on port {port}")
+    LOGGER.info(f"WebSocket server is running on port {port}")
     async with serve(handle_connection, "localhost", port):
         await asyncio.Future()
 

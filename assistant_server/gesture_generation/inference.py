@@ -1,7 +1,8 @@
 import json
+import logging
 import os
-import tempfile
 import sys
+import tempfile
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, List, Optional, Tuple
@@ -16,12 +17,12 @@ from assistant_server.gesture_generation.anim import bvh, quat
 from assistant_server.gesture_generation.anim.txform import \
     xform_orthogonalize_from_xy
 from assistant_server.gesture_generation.audio.audio_files import read_wavfile
+from assistant_server.gesture_generation.bvh import write_bvh
 from assistant_server.gesture_generation.data_pipeline import (
     preprocess_animation, preprocess_audio)
 from assistant_server.gesture_generation.helpers import split_by_ratio
 from assistant_server.gesture_generation.postprocessing import reset_pose
-from assistant_server.gesture_generation.utils import timeit, write_bvh
-
+from assistant_server.utils.common import timeit
 
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
@@ -63,6 +64,8 @@ class BasePos:
 
 class GestureInferenceModel:
     def __init__(self, options_path: str = "./data/zeggs/options.json", style: str = "Happy"):
+        self.logger = logging.getLogger(__name__)
+        
         with open(options_path, "r") as f:
             options = json.load(f)
 
@@ -89,6 +92,8 @@ class GestureInferenceModel:
         self.style_encoding: List = []
         self.base_pos: Optional[BasePos] = None
         self.prev_anim: Optional[dict] = None
+
+        
 
     def load_style_encoding(self, style: str, temperature: float = 1.0) -> Tuple[List[Any], BasePos]:
         config = self.config
@@ -417,7 +422,7 @@ class GestureInferenceModel:
 
                 return result_path
             except (PermissionError, OSError) as e:
-                print(e)
+                self.logger.error(f"Failed to write BVH file: {e}")
                 return None
 
     @timeit

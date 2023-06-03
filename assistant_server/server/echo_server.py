@@ -1,6 +1,9 @@
 import asyncio
+import logging
 
-from websockets.server import serve, WebSocketServerProtocol
+from websockets.server import WebSocketServerProtocol, serve
+
+LOGGER = logging.getLogger(__name__)
 
 
 async def echo(websocket: WebSocketServerProtocol, path: str) -> None:
@@ -9,13 +12,14 @@ async def echo(websocket: WebSocketServerProtocol, path: str) -> None:
         return
 
     async for message in websocket:
-        str_message = message.decode("utf-8") if isinstance(message, bytes) else message
-        print(f"Received: {str_message}")
+        str_message = message.decode(
+            "utf-8") if isinstance(message, bytes) else message
+        LOGGER.info(f"Received: {str_message}")
         await websocket.send(f"Echo: {str_message}")
 
 
 async def start():
     PORT = 3000
-    print(f"Running server on port {PORT}")
+    LOGGER.info(f"Running server on port {PORT}")
     async with serve(echo, "", port=PORT):
         await asyncio.Future()

@@ -1,13 +1,19 @@
-import json
-import re
-import os
 import asyncio
+import json
+import logging
+import os
+import re
 from typing import AsyncGenerator, Iterator, List, Optional
+
 import aiohttp
 from dotenv import load_dotenv
 
+from assistant_server.utils.common import timeit
+
 load_dotenv()
 API_KEY = os.getenv("OPENAI_API_KEY")
+
+LOGGER = logging.getLogger(__name__)
 
 
 class Statement:
@@ -136,7 +142,7 @@ async def gpt(user_prompt: str) -> AsyncGenerator[Statement, None]:
     with open(f"{current_dir}/configs/system_prompt.txt", "r") as f:
         system_prompt = f.read()
 
-    print(f"Asking GPT-4 for {user_prompt}")
+    LOGGER.info(f"Asking GPT-4 for {user_prompt}")
     statement_transformer = StatementTransformer()
 
     async for data in stream(user_prompt, system_prompt, "gpt-4"):
@@ -148,13 +154,13 @@ async def gpt(user_prompt: str) -> AsyncGenerator[Statement, None]:
             for statement in statements:
                 yield statement
 
-    print(f"Full buffer: {statement_transformer.full_buffer}")
+    LOGGER.info(f"Full buffer: {statement_transformer.full_buffer}")
 
 
 async def test():
     user_prompt = "Write a Python function that takes two numbers and returns their sum."
     async for statement in gpt(user_prompt):
-        print(statement)
+        LOGGER.info(statement)
 
 
 if __name__ == "__main__":

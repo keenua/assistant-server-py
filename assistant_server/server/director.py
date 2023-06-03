@@ -1,19 +1,20 @@
 import asyncio
-from io import BytesIO
 import json
+import logging
 import os
-
 from dataclasses import dataclass
 from time import time
-from uuid import uuid4
 from typing import AsyncGenerator, List, Optional
+from uuid import uuid4
+
 from pydub import AudioSegment
 
 from assistant_server.api_clients.speech import generate_speech
 from assistant_server.gesture_generation.inference import GestureInferenceModel
 from assistant_server.gesture_generation.visemes import Visemes
 from assistant_server.server.audio import AudioBuffer
-from assistant_server.server.utils import bytes_to_base64, export_flac, save_wav
+from assistant_server.utils.audio import bytes_to_base64, export_flac, save_wav
+from assistant_server.utils.common import timeit
 
 
 @dataclass
@@ -75,6 +76,8 @@ EMOTION_TO_STYLE = {
 
 class Director:
     def __init__(self, preferred_buffer_time: float = 2.0) -> None:
+        self.logger = logging.getLogger(__name__)
+
         self.FPS = 60
         self.PREFFERED_BUFFER_TIME = preferred_buffer_time
 
@@ -95,8 +98,9 @@ class Director:
 
         self.run_task: Optional[asyncio.Task] = None
 
+
     def add_statement(self, statement: StatementData) -> None:
-        print(f"Statement added: {statement.text}")
+        self.logger.info(f"Statement added: {statement.text}")
         self.processing = True
         self.statement_queue.append(statement)
 
@@ -111,12 +115,13 @@ class Director:
         return self.get_buffer_time() >= self.PREFFERED_BUFFER_TIME
 
     async def __fill_audio_buffer(self, text: str, emotion: str, buffer: AudioBuffer) -> None:
-        print(f"Generating audio for: {text}")
+        self.logger.info(f"Generating audio for: {text}")
         async for audio in generate_speech(text, emotion):
             await buffer.append(audio)
 
         await buffer.flush()
 
+    @timeit
     def __generate_from_audio(self, available: bool, audio: AudioSegment, emotion: Optional[str], text: Optional[str]) -> List[Frame]:
         start_frame_index = self.frame_index
         wav_file = f"{uuid4()}.wav"
@@ -132,7 +137,7 @@ class Director:
         frames_shift = int(self.sound_duration_ms / 1000 * self.FPS) - self.frames_played
 
         if frames_shift != 0:
-            print(f"Frame shift {frames_shift}")
+            self.logger.info(f"Frame shift {frames_shift}")
 
         if frames_shift > 0:
             # repeat first frame
@@ -221,7 +226,7 @@ class Director:
 
             self.processing = not task_empty or await buffer.sound_available()
 
-            # print(f"Buffer: {self.get_buffer_time()}")
+            # self.logger.info(f"Buffer: {self.get_buffer_time()}")
             await asyncio.sleep(0.1)
 
     async def __generate_frames_from_files(self, dir: str) -> AsyncGenerator[Frame, None]:

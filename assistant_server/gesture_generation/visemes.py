@@ -8,10 +8,12 @@ from allosaurus.lm.inventory import Inventory
 from allosaurus.model import get_model_path
 import cv2
 import numpy as np
-from moviepy.editor import VideoFileClip, AudioFileClip, CompositeAudioClip
-from assistant_server.gesture_generation.utils import timeit
+from moviepy.editor import VideoFileClip, AudioFileClip
+
+from assistant_server.utils.common import timeit
 
 CURRENT_DIR = os.path.dirname(os.path.realpath(__file__))
+
 
 @dataclass
 class Frame:
@@ -72,30 +74,30 @@ class VisemeMovieMaker():
 
     def generate_video(self, in_file: str):
         file_name = os.path.basename(in_file).split(".")[0]
-        
+
         audio = AudioFileClip(in_file)
         audio_dur = audio.duration
         audio.close()
 
         self.out_path = (os.path.join(self.out_dir, f'{file_name}.mp4'))
-        
+
         output = self.get_out(self.out_path)
         phones = self.generator.recognize(in_file)
-        
+
         for frame_index in range(0, int(audio_dur * self.fps)):
             current_timestamp = frame_index / self.fps
             while phones and phones[0].start + phones[0].duration <= current_timestamp:
                 phones.pop(0)
 
             current_phone = phones[0] if phones else None
-            
+
             if current_phone and current_phone.start > current_timestamp:
                 current_phone = None
 
             mapped = self.VISEME_TO_FILE[current_phone.viseme if current_phone else ""]
             cv_frame = self.make_frame(mapped)
             output.write(cv_frame)
-    
+
         output.release()
         cv2.destroyAllWindows()
         print(
@@ -115,7 +117,7 @@ class VisemeMovieMaker():
         final_video = video_clip.set_audio(audio_clip)
         print(
             f"Successfully generated video of {final_video.end} milliseconds from video and audio streams.")
-        
+
         file_dir = os.path.dirname(video_file)
         file_name = os.path.basename(video_file).split(".")[0]
         video_out_path = f"{file_dir}/{file_name}_with_audio.mp4"
@@ -190,7 +192,8 @@ class Visemes():
             next_phone = phones[i + 1]
 
             max_duration = next_phone.start - current_phone.start
-            current_phone.duration = min(max(current_phone.duration, 0.5), max_duration)
+            current_phone.duration = min(
+                max(current_phone.duration, 0.5), max_duration)
 
             if max_duration > 0.5:
                 current_phone.duration = min(0.25, current_phone.duration)

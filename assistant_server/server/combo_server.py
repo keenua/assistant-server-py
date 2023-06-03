@@ -2,6 +2,8 @@ import asyncio
 import json
 import os
 import time
+import logging
+
 from typing import Awaitable, Callable, List, Optional
 
 from websockets.server import WebSocketServerProtocol, serve
@@ -14,7 +16,7 @@ last_ping_time = time.time()
 frame_package_index: int = 0
 current_dir = os.path.dirname(os.path.realpath(__file__))
 frames_dir = f"{current_dir}/../../data/samples/frames/divorce_ogg"
-
+LOGGER = logging.getLogger(__name__)
 FRAMES_FROM_FILE = False
 
 async def process_prompt(prompt: str, director: Director) -> None:
@@ -48,7 +50,7 @@ async def check_heartbeat(disconnect_timeout=6):
     while True:
         await asyncio.sleep(1)
         if time.time() - last_ping_time > disconnect_timeout:
-            print("Ping timeout, raising close exception")
+            LOGGER.info("Ping timeout, raising close exception")
             raise ConnectionClosed(None, None)
 
 
@@ -59,7 +61,7 @@ async def handle_messages(websocket: WebSocketServerProtocol, processing_queue: 
 
             message_str = message.decode(
                 "utf-8") if isinstance(message, bytes) else message
-            print(f"Received message: {message_str}")
+            LOGGER.info(f"Received message: {message_str}")
 
             if message_str == "ping":
                 global last_ping_time
@@ -67,12 +69,12 @@ async def handle_messages(websocket: WebSocketServerProtocol, processing_queue: 
             else:
                 processing_queue.put_nowait(message_str)
         except ConnectionClosed:
-            print("Connection closed, stopping message handler")
+            LOGGER.error("Connection closed, stopping message handler")
             break
 
 
 async def handle_connection(websocket: WebSocketServerProtocol, path: str) -> None:
-    print("Client connected")
+    LOGGER.info("Client connected")
 
     director = Director()
     director.start(frames_dir if FRAMES_FROM_FILE else None)
@@ -80,7 +82,7 @@ async def handle_connection(websocket: WebSocketServerProtocol, path: str) -> No
     async def process_frames(frames: List[Frame]):
         global frame_package_index
 
-        print(f"Sending {len(frames)} frames")
+        LOGGER.info(f"Sending {len(frames)} frames")
         result = {
             "frames": [frame.__dict__ for frame in frames]
         }
@@ -92,7 +94,7 @@ async def handle_connection(websocket: WebSocketServerProtocol, path: str) -> No
         try:
             await websocket.send(json.dumps(result))
         except ConnectionClosed as e:
-            print("Connection closed")
+            LOGGER.error("Connection closed")
             raise e
 
     processing_queue: asyncio.Queue[str] = asyncio.Queue()
@@ -116,14 +118,14 @@ async def handle_connection(websocket: WebSocketServerProtocol, path: str) -> No
 
         if heartbeat_task:
             heartbeat_task.add_done_callback(
-                lambda _: (handle_messages_task and handle_messages_task.cancel(), print("Heartbeat task done")))
+                lambda _: (handle_messages_task and handle_messages_task.cancel(), LOGGER.info("Heartbeat task done")))
 
-        print("Waiting for messages")
+        LOGGER.info("Waiting for messages")
 
         await handle_messages_task
 
     finally:
-        print("Client disconnected")
+        LOGGER.info("Client disconnected")
 
         if process_queue_task:
             process_queue_task.cancel()
@@ -137,7 +139,7 @@ async def handle_connection(websocket: WebSocketServerProtocol, path: str) -> No
 
 async def start():
     port = 3000
-    print(f"WebSocket server is running on port {port}")
+    LOGGER.info(f"WebSocket server is running on port {port}")
     async with serve(handle_connection, port=port):
         await asyncio.Future()
 
