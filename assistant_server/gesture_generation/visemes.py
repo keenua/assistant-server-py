@@ -1,15 +1,16 @@
+import os
 from argparse import Namespace
 from dataclasses import dataclass
-import os
 from pathlib import Path
 from typing import List, Tuple
 
+import cv2
+import numpy as np
+import torch
 from allosaurus.app import read_recognizer
 from allosaurus.lm.inventory import Inventory
 from allosaurus.model import get_model_path
-import cv2
-import numpy as np
-from moviepy.editor import VideoFileClip, AudioFileClip
+from moviepy.editor import AudioFileClip, VideoFileClip
 
 from assistant_server.utils.common import timeit
 
@@ -175,7 +176,8 @@ class Visemes():
         self.model_name = model_name
         self.lang = lang
         self.update_phone()
-        self.recognizer = read_recognizer(Namespace(model=model_name, device_id=0, lang='ipa', approximate=False, prior=None))
+        device_id = 0 if torch.cuda.is_available() else -1
+        self.recognizer = read_recognizer(Namespace(model=model_name, device_id=device_id, lang='ipa', approximate=False, prior=None))
 
     def parse_frames(self, phones: str) -> List[Frame]:
         frames = []
