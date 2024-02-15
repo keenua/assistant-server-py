@@ -2,6 +2,10 @@ If you find this project useful, consider buying me a coffee!
 
 [!["Buy Me A Coffee"](https://www.buymeacoffee.com/assets/img/custom_images/orange_img.png)](https://www.buymeacoffee.com/keenua)
 
+# Demo
+
+[![Assistant demo](https://img.youtube.com/vi/j1ibIys9Yj8/0.jpg)](https://www.youtube.com/watch?v=j1ibIys9Yj8)
+
 # Running locally
 
 ## Checking out the repositories
@@ -118,3 +122,9 @@ If it returns `False`, run:
 ```bash
 sudo bash /opt/nvidia/drivers/linux_nvidia_client.run --ui=none --no-questions
 ```
+
+## Acknowledgements
+
+- Gesture generation is based on [Zeggs](https://github.com/ubisoft/ubisoft-laforge-ZeroEGGS), [license](https://github.com/ubisoft/ubisoft-laforge-ZeroEGGS/blob/main/License.md)
+- Phonemes generation is using [Allosaurus](https://github.com/xinjli/allosaurus) libary, [license](https://github.com/xinjli/allosaurus/blob/master/LICENSE)
+- BVH data is generated using [bvhio](https://github.com/Wasserwecken/bvhio) library, [license](https://github.com/Wasserwecken/bvhio/blob/main/LICENSE)
