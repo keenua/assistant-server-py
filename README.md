@@ -1,3 +1,7 @@
+If you find this project useful, consider buying me a coffee!
+
+[!["Buy Me A Coffee"](https://www.buymeacoffee.com/assets/img/custom_images/orange_img.png)](https://www.buymeacoffee.com/keenua)
+
 # Running locally
 
 ## Checking out the repositories
@@ -25,6 +29,11 @@ I'm using miniconda both on windows and linux, but you can use anaconda if you p
 - Create a new environment from the environment.yml file
 ```shell
 conda env create -f environment.yml
+```
+
+If you're running the server on linux, use:
+```shell
+conda env create -f environment.linux.yml
 ```
 
 - Activate environment
@@ -58,10 +67,13 @@ python -m assistant_server.server
 - When asked about rebuilding the project, click yes
 - Go to the [main level blueprint](https://forums.unrealengine.com/t/how-to-open-level-blueprint-in-ue5/525760)
 - Paste your API key into `API key` variable of the `Speech To Text` node
-![API key](./docs/api_key.png|width=400)
+
+![API key](./docs/api_key.png)
+
 - Compile and save the blueprint
 - [Optional] If you're running the server on a different machine, open the `BP_Server` blueprint from `/Content/Custom/BP_server.uasset` and change the `Server URL` variable in the `Create Web Socket` node to match the IP address of the server machine. Example: `ws://192.168.0.1:3000`
-![Server URL](./docs/server_endpoint.png|width=400)
+
+![Server URL](./docs/server_endpoint.png)
 
 ## Running the Unreal Engine project
 
